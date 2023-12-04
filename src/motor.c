@@ -141,9 +141,13 @@ void kickCommand(KeyboardHandlerPacket *packet, const char *name) {
     for(int i = 0; i < packet->players->nPLayers; ++i) {
         if(!strcmp(packet->players->array[i].name, name)) {
             Packet packetSender = {KICK, "Bye Bye\n"};
-            int fd = openPipeForWriting(packet->players->array->pipe);
+            int fd = openPipeForWriting(packet->players->array[i].pipe);
             writeToPipe(fd, &packetSender, sizeof(Packet));
+            close(fd);
             //TODO: REMOVE PLAYER FROM ARRAY
+            packet->players->array[i] = packet->players->array[packet->players->nPLayers - 1];
+            packet->players->nPLayers--;
+            return;
         }
     }
 }
