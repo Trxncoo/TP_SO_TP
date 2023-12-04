@@ -1,3 +1,11 @@
+export INSCRICAO=300
+export NPLAYERS=2
+export DURACAO=300
+export DECREMENTO=10
+
+
+
+
 cd ..
 
 make clean
