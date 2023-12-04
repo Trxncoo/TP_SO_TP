@@ -20,18 +20,40 @@
 #define MAX_HEIGHT 16
 #define MAX_WIDTH 40
 #define COMMAND_BUFFER_SIZE 40
+#define MAX_PIPE_SIZE 12
+
+typedef enum {
+    KICK
+} MessageType;
 
 typedef struct {
-    char   name[PLAYER_NAME_SIZE];
-    pid_t  pid;
-    int    xCoordinate;
-    int    yCoordinate;
-    char   icone;
+    char name[PLAYER_NAME_SIZE];
+    pid_t pid;
+    char pipe[MAX_PIPE_SIZE];
+    int xCoordinate;
+    int yCoordinate;
+    char icone;
+    int isPlaying;
 } Player;
 
 typedef struct {
     Player array[MAX_PLAYERS];
     int nPLayers;
 } PlayerArray;
+
+typedef struct {
+    char array[MAX_HEIGHT][MAX_WIDTH];
+} Map;
+
+typedef struct {
+    PlayerArray *players;
+    Map *map;
+    int keyboardFeed;
+} KeyboardHandlerPacket;
+
+typedef struct {
+    MessageType type;
+    char content[COMMAND_BUFFER_SIZE];
+} Packet;
 
 #endif

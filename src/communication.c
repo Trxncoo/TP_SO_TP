@@ -8,16 +8,7 @@ void makePipe(const char *pipeName) {
 }
 
 void writeToPipe(const int fd, void *data, size_t size) {
-    ssize_t bytesWritten = 0;
-
-    if(size == sizeof(Player)) {
-        bytesWritten = write(fd, data, size);
-    } else {
-        PERROR("Writing data not recognised");
-        close(fd);
-        exit(EXIT_FAILURE);    
-    }
-
+    ssize_t bytesWritten = write(fd, data, size);
     if (bytesWritten == -1) {
         PERROR("Writing to Pipe");
         close(fd);
@@ -26,21 +17,21 @@ void writeToPipe(const int fd, void *data, size_t size) {
 }
 
 void readFromPipe(const int fd, void *data, size_t size) {
-    ssize_t bytesRead = 0;
-
-    if(size == sizeof(Player)) {
-        bytesRead = read(fd, data, size);
-    } else {
-        PERROR("Reading data not recognised");
-        close(fd);
-        exit(EXIT_FAILURE); 
-    }
-
+    ssize_t bytesRead = read(fd, data, size);
     if (bytesRead == -1) {
         PERROR("Reading from Pipe");
         close(fd);
         exit(EXIT_FAILURE);
     }
+}
+
+int openPipeForReading(const char *pipeName) {
+    int fd = open(pipeName, O_RDONLY);
+    if (fd == -1) {
+        PERROR("Opening Pipe for Reading");
+        exit(EXIT_FAILURE);
+    }
+    return fd;
 }
 
 int openPipeForWriting(const char *pipeName) {
@@ -63,6 +54,7 @@ int openPipeForReadingWriting(const char *pipeName) {
 
 void cleanUpandexit(int signum) {
     unlink(JOGOUI_TO_MOTOR_PIPE);
+    exit(0);
     printf("Morri\n");
 }
 
