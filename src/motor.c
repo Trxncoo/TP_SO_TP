@@ -11,7 +11,7 @@ void kickCommand(KeyboardHandlerPacket *packet, const char *name);
 void playerLobby(KeyboardHandlerPacket *keyboardPacket, PlayerArray *players, const int motorFd);
 
 int main(int argc, char* argv[]) {  
-    PlayerArray players;
+    PlayerArray players={};
     Map map;
     KeyboardHandlerPacket keyboardPacket = {&players, &map, 1};
     int motorFd;
