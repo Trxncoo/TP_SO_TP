@@ -8,6 +8,8 @@ int main(int argc, char* argv[]) {
     int jogoUIFd, motorFd;
     int confirmationFlag = 0;
 
+    setupSigIntJogoUI();
+
     initPlayer(&player, argc, argv);
 
     // Cria o pipe para receber dados

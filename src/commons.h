@@ -18,8 +18,8 @@
 #define PLAYER_NAME_SIZE 20
 #define MAX_PLAYERS 5
 #define MAX_HEIGHT 16
-#define MAX_WIDTH 40
-#define COMMAND_BUFFER_SIZE 40
+#define MAX_WIDTH 81
+#define COMMAND_BUFFER_SIZE 80
 #define MAX_PIPE_SIZE 12
 
 typedef enum {

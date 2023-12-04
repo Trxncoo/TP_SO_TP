@@ -12,7 +12,9 @@ void readFromPipe(const int fd, void *data, size_t size);
 int openPipeForReading(const char *pipeName);
 int openPipeForWriting(const char *pipeName);
 int openPipeForReadingWriting(const char *pipeName);
-void cleanUpandexit(int signum);
-void setupSigInt();
+void cleanUpandexitMotor(int signum);
+void setupSigIntMotor();
+void cleanUpandexitJogoUI(int signum);
+void setupSigIntJogoUI();
 
 #endif

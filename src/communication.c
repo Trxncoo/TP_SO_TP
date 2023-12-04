@@ -52,15 +52,14 @@ int openPipeForReadingWriting(const char *pipeName) {
     return fd;
 }
 
-void cleanUpandexit(int signum) {
+void cleanUpandexitMotor(int signum) {
     unlink(JOGOUI_TO_MOTOR_PIPE);
     exit(0);
-    printf("Morri\n");
 }
 
-void setupSigInt() {
+void setupSigIntMotor() {
     struct sigaction sigIntHandler;
-    sigIntHandler.sa_handler = cleanUpandexit;
+    sigIntHandler.sa_handler = cleanUpandexitMotor;
     sigemptyset(&sigIntHandler.sa_mask);
     sigIntHandler.sa_flags = 0;
 
@@ -68,4 +67,23 @@ void setupSigInt() {
         PERROR("sigaction");
         exit(EXIT_FAILURE);
     }
+}
+
+void setupSigIntJogoUI() {
+    struct sigaction sigIntHandler;
+    sigIntHandler.sa_handler = cleanUpandexitJogoUI;
+    sigemptyset(&sigIntHandler.sa_mask);
+    sigIntHandler.sa_flags = 0;
+
+    if (sigaction(SIGINT, &sigIntHandler, NULL) == -1) {
+        PERROR("sigaction");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void cleanUpandexitJogoUI(int signum) {
+    char buffer[20];
+    sprintf(buffer, MOTOR_TO_JOGOUI_PIPE, getpid());
+    unlink(buffer);
+    exit(0);
 }

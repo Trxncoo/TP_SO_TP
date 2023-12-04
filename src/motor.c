@@ -1,4 +1,5 @@
 #include "communication.h"
+#include "cursesHelpers.h"
 
 int isNameAvailable(const PlayerArray *players, const char *name);
 void readMapFromFile(char map[MAX_HEIGHT][MAX_WIDTH], const char *filename);
@@ -21,11 +22,10 @@ int main(int argc, char* argv[]) {
     pthread_t tid;
     int currentLevel = 1, gameRun;
 
-    getEnvs(&inscricao, &nplayers, &duracao, &decremento);
-    printf("Variaveis de ambiente conseguidas\n");
+    //getEnvs(&inscricao, &nplayers, &duracao, &decremento);
 
     // Prepara "Ctrl c"
-    setupSigInt();
+    setupSigIntMotor();
 
     // Cria pipe para receber dados
     makePipe(JOGOUI_TO_MOTOR_PIPE);
@@ -40,8 +40,14 @@ int main(int argc, char* argv[]) {
     motorFd = openPipeForReadingWriting(JOGOUI_TO_MOTOR_PIPE);
     
     playerLobby(&keyboardPacket, &players, motorFd);
+    readMapFromFile(map.array, "map.txt");
     
-    printf("Opa\n");
+    initScreen();
+    WINDOW *mapWindow = newwin(MAX_HEIGHT + 2, MAX_WIDTH + 2, 0, (COLS - MAX_WIDTH + 2) / 2);
+    drawBorder(mapWindow);
+    printMap(mapWindow, &map);
+
+    
     /*
     while(currentLevel < 4) {
         //sendMap
