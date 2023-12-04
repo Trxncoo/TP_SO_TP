@@ -8,7 +8,8 @@ void makePipe(const char *pipeName) {
 }
 
 void writeToPipe(const int fd, void *data, size_t size) {
-    ssize_t bytesWritten = write(fd, data, size);
+    ssize_t bytesWritten;
+    while(!(bytesWritten = write(fd, data, size)));
     if (bytesWritten == -1) {
         PERROR("Writing to Pipe");
         close(fd);
@@ -17,7 +18,8 @@ void writeToPipe(const int fd, void *data, size_t size) {
 }
 
 void readFromPipe(const int fd, void *data, size_t size) {
-    ssize_t bytesRead = read(fd, data, size);
+    ssize_t bytesRead;
+    while(!(bytesRead = read(fd, data, size)));
     if (bytesRead == -1) {
         PERROR("Reading from Pipe");
         close(fd);
@@ -87,3 +89,4 @@ void cleanUpandexitJogoUI(int signum) {
     unlink(buffer);
     exit(0);
 }
+

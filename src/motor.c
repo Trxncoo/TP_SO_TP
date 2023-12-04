@@ -14,8 +14,8 @@ void getEnvs(int* inscricao, int* nplayers, int* duracao, int* decremento);
 
 int main(int argc, char* argv[]) {  
     int inscricao, nplayers, duracao, decremento; //Criar variaveis de ambiente
-    PlayerArray players={};
-    Map map;
+    PlayerArray players = {};
+    Map map = {};
     KeyboardHandlerPacket keyboardPacket = {&players, &map, 1};
     int motorFd;
     int jogoUIFd[MAX_PLAYERS];
@@ -39,20 +39,22 @@ int main(int argc, char* argv[]) {
     // Abre o pipe para receber dados
     motorFd = openPipeForReadingWriting(JOGOUI_TO_MOTOR_PIPE);
     
+    // Recebe Players
     playerLobby(&keyboardPacket, &players, motorFd);
-    readMapFromFile(map.array, "map.txt");
-    
-    initScreen();
-    WINDOW *mapWindow = newwin(MAX_HEIGHT + 2, MAX_WIDTH + 2, 0, (COLS - MAX_WIDTH + 2) / 2);
-    drawBorder(mapWindow);
-    printMap(mapWindow, &map);
+
+    // Envia array de Players aos Players
+    for(int i = 0; i < players.nPlayers; ++i) {
+        jogoUIFd[i] = openPipeForWriting(players.array[i].pipe);
+        writeToPipe(jogoUIFd[i], &players, sizeof(PlayerArray));
+    }
 
     
+
     /*
     while(currentLevel < 4) {
         //sendMap
         readMapFromFile(map.array, "map.txt");
-        for(int i = 0; i < players.nPLayers; ++i) {
+        for(int i = 0; i < players.nPlayers; ++i) {
             int fd = openPipeForWriting(players.array->pipe);
             writeToPipe(fd, &map, sizeof(Map));
             close(fd);
@@ -76,7 +78,7 @@ int main(int argc, char* argv[]) {
 }
 
 int isNameAvailable(const PlayerArray *players, const char *name) {
-    for(int i = 0; i < players->nPLayers; ++i) {
+    for(int i = 0; i < players->nPlayers; ++i) {
         if(!strcmp(name, players[i].array->name)) {
             return 0;
         }
@@ -132,7 +134,7 @@ int handleCommand(char *input, KeyboardHandlerPacket *packet) {
 
 void usersCommand(KeyboardHandlerPacket *packet) {
     printf("User List:\n");
-    for(int i = 0; i < packet->players->nPLayers; ++i) {
+    for(int i = 0; i < packet->players->nPlayers; ++i) {
         printf("\t<%s>\n", packet->players->array[i].name);
     }
 }
@@ -144,33 +146,32 @@ void beginCommand(KeyboardHandlerPacket *packet) {
 
 void kickCommand(KeyboardHandlerPacket *packet, const char *name) {
     printf("Kicking: %s\n", name);
-    for(int i = 0; i < packet->players->nPLayers; ++i) {
+    for(int i = 0; i < packet->players->nPlayers; ++i) {
         if(!strcmp(packet->players->array[i].name, name)) {
             Packet packetSender = {KICK, "Bye Bye\n"};
             int fd = openPipeForWriting(packet->players->array[i].pipe);
             writeToPipe(fd, &packetSender, sizeof(Packet));
             close(fd);
-            //TODO: REMOVE PLAYER FROM ARRAY
-            packet->players->array[i] = packet->players->array[packet->players->nPLayers - 1];
-            packet->players->nPLayers--;
+            packet->players->array[i] = packet->players->array[packet->players->nPlayers - 1];
+            packet->players->nPlayers--;
             return;
         }
     }
 }
 
 void playerLobby(KeyboardHandlerPacket *keyboardPacket, PlayerArray *players, const int motorFd) {
-    while(keyboardPacket->keyboardFeed && players->nPLayers < MAX_PLAYERS) {
+    while(keyboardPacket->keyboardFeed && players->nPlayers < MAX_PLAYERS) {
         int confirmationFlag = 0;
-        readFromPipe(motorFd, &players->array[players->nPLayers], sizeof(Player));
-        int currentjogoUIFd = openPipeForWriting(players->array[players->nPLayers].pipe);
-        if(isNameAvailable(players, players->array[players->nPLayers].name)) {
-            players->array[players->nPLayers].isPlaying = 1;
+        readFromPipe(motorFd, &players->array[players->nPlayers], sizeof(Player));
+        int currentjogoUIFd = openPipeForWriting(players->array[players->nPlayers].pipe);
+        if(isNameAvailable(players, players->array[players->nPlayers].name)) {
+            players->array[players->nPlayers].isPlaying = 1;
             confirmationFlag = 1;
             writeToPipe(currentjogoUIFd, &confirmationFlag, sizeof(int));
         } else {
             writeToPipe(currentjogoUIFd, &confirmationFlag, sizeof(int));
         }
-        players->nPLayers++;  
+        players->nPlayers++;  
         close(currentjogoUIFd);      
     }
 }

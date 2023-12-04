@@ -21,9 +21,13 @@
 #define MAX_WIDTH 81
 #define COMMAND_BUFFER_SIZE 80
 #define MAX_PIPE_SIZE 12
+#define COMMAND_MAX_HEIGHT 10
+#define COMMAND_MAX_WIDTH 60
+#define PADDING 2
 
 typedef enum {
-    KICK
+    KICK,
+    MESSAGE
 } MessageType;
 
 typedef struct {
@@ -38,7 +42,7 @@ typedef struct {
 
 typedef struct {
     Player array[MAX_PLAYERS];
-    int nPLayers;
+    int nPlayers;
 } PlayerArray;
 
 typedef struct {

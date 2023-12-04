@@ -3,13 +3,17 @@
 void initPlayer(Player* player, const int argc, char* argv[]);
 
 int main(int argc, char* argv[]) {
-    Player player; 
-    Map map;
+    Player player = {}; 
+    PlayerArray players = {};
+    Map map = {};
+    KeyboardHandlerPacket keyboardPacket = {&players, &map, 1};
     int jogoUIFd, motorFd;
     int confirmationFlag = 0;
 
+    // Prepara "Ctrl C"
     setupSigIntJogoUI();
 
+    // Inicializa Players
     initPlayer(&player, argc, argv);
 
     // Cria o pipe para receber dados
@@ -28,8 +32,12 @@ int main(int argc, char* argv[]) {
         printf("Nome ja existe, registado como espetador\n");
     }
 
+    // Recebe Array de Players do motor
+    readFromPipe(jogoUIFd, &players, sizeof(PlayerArray));
+    
     Packet packet;
     while(1) {
+        printf("Here i go\n"); fflush(stdout);
         readFromPipe(jogoUIFd, &packet, sizeof(Packet));
         switch(packet.type) {
             case KICK:
@@ -38,6 +46,7 @@ int main(int argc, char* argv[]) {
                 close(jogoUIFd);
                 unlink(player.pipe);
                 exit(0);
+
             default:
                 break;
         }
@@ -63,4 +72,5 @@ void initPlayer(Player* player, const int argc, char* argv[]) {
     sprintf(player->pipe, MOTOR_TO_JOGOUI_PIPE, player->pid);
     player->isPlaying = 0;
 }
+
 
