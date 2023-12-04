@@ -9,8 +9,10 @@ void usersCommand(KeyboardHandlerPacket *packet);
 void beginCommand(KeyboardHandlerPacket *packet);
 void kickCommand(KeyboardHandlerPacket *packet, const char *name);
 void playerLobby(KeyboardHandlerPacket *keyboardPacket, PlayerArray *players, const int motorFd);
+void getEnvs(int* inscricao, int* nplayers, int* duracao, int* decremento);
 
 int main(int argc, char* argv[]) {  
+    int inscricao, nplayers, duracao, decremento; //Criar variaveis de ambiente
     PlayerArray players={};
     Map map;
     KeyboardHandlerPacket keyboardPacket = {&players, &map, 1};
@@ -18,6 +20,9 @@ int main(int argc, char* argv[]) {
     int jogoUIFd[MAX_PLAYERS];
     pthread_t tid;
     int currentLevel = 1, gameRun;
+
+    getEnvs(&inscricao, &nplayers, &duracao, &decremento);
+    printf("Variaveis de ambiente conseguidas\n");
 
     // Prepara "Ctrl c"
     setupSigInt();
@@ -159,3 +164,15 @@ void playerLobby(KeyboardHandlerPacket *keyboardPacket, PlayerArray *players, co
         close(currentjogoUIFd);      
     }
 }
+
+void getEnvs(int* inscricao, int* nplayers, int* duracao, int* decremento) {
+    if(getenv("INSCRICAO") == NULL || getenv("NPLAYERS") == NULL || getenv("DURACAO") == NULL || getenv("DECREMENTO") == NULL) {
+        printf("Ocorreu um erro a encontrar variaveis de ambiente\n");
+        exit(1);
+    }
+    *inscricao = atoi(getenv("INSCRICAO"));
+    *nplayers = atoi(getenv("NPLAYERS"));
+    *duracao = atoi(getenv("DURACAO"));
+    *decremento = atoi(getenv("DECREMENTO"));
+}
+
