@@ -28,7 +28,8 @@
 typedef enum {
     KICK,
     MESSAGE,
-    EXIT
+    EXIT,
+    SYNC
 } MessageType;
 
 
@@ -60,8 +61,18 @@ typedef struct {
 } KeyboardHandlerPacket;
 
 typedef struct {
-    MessageType type;
+    PlayerArray players;
+    Map map;
+} SynchronizePacket;
+
+union Data {
     char content[COMMAND_BUFFER_SIZE];
+    SynchronizePacket syncPacket;
+};
+
+typedef struct {
+    MessageType type;
+    union Data data;
 } Packet;
 
 #endif

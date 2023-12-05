@@ -123,9 +123,23 @@ void *handleJogoUI(void *args) {
         readFromPipe(*packet->motorFd, &typePacket, sizeof(Packet));
         switch(typePacket.type) {
             case EXIT:
-                printf("A expulsar %s\n", typePacket.content);
+                printf("A expulsar %s\n", typePacket.data.content);
+                for(int i = 0; i < packet->players->nPlayers; ++i) {
+                    if(!strcmp(typePacket.data.content, packet->players->array[i].name)) {
+                        packet->players->array[i] = packet->players->array[packet->players->nPlayers - 1];
+                        packet->players->playerFd[i] = packet->players->playerFd[packet->players->nPlayers - 1];
+                        packet->players->nPlayers--;
+                    }
+                }
                 break;
+        }
 
+        for(int i = 0; i < packet->players->nPlayers; ++i) {
+            Packet packetSender;
+            packetSender.type = SYNC;
+            packetSender.data.syncPacket.players = *packet->players;
+            printf("%d\n", packetSender.data.syncPacket.players.nPlayers);
+            writeToPipe(packet->players->playerFd[i], &packetSender, sizeof(Packet));
         }
     }
 }
@@ -167,7 +181,9 @@ void kickCommand(KeyboardHandlerPacket *packet, const char *name) {
     printf("Kicking: %s\n", name);
     for(int i = 0; i < packet->players->nPlayers; ++i) {
         if(!strcmp(packet->players->array[i].name, name)) {
-            Packet packetSender = {KICK, "Bye Bye\n"};
+            Packet packetSender;
+            packetSender.type = KICK;
+            strcpy(packetSender.data.content, "Bye Bye");
             int fd = openPipeForWriting(packet->players->array[i].pipe);
             writeToPipe(fd, &packetSender, sizeof(Packet));
             close(fd);

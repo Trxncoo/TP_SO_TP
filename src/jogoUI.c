@@ -57,14 +57,20 @@ int main(int argc, char* argv[]) {
         readFromPipe(jogoUIFd, &packet, sizeof(Packet));
         switch(packet.type) {
             case KICK:
-                printf("%s\n", packet.content);
+                printf("%s\n", packet.data.content);
                 close(motorFd);
                 close(jogoUIFd);
                 unlink(player.pipe);
                 exit(0);
 
             case MESSAGE:
-                printf("%s\n", packet.content);
+                printf("%s\n", packet.data.content);
+                break;
+
+            case SYNC:
+                players = packet.data.syncPacket.players;
+                printf("NUmero de players:%d\n", players.nPlayers);
+                break;
 
             default:
                 break;
@@ -127,7 +133,7 @@ void msgCommand(KeyboardHandlerPacket *packet, char *arg1, char *arg2) {
     for(int i = 0; i < packet->players->nPlayers; ++i) {
         if(!strcmp(packet->players->array[i].name, arg1)) {
             Packet packetSender = {MESSAGE};
-            strcpy(packetSender.content, arg2);
+            strcpy(packetSender.data.content, arg2);
             int fd = openPipeForWriting(packet->players->array[i].pipe);
             writeToPipe(fd, &packetSender, sizeof(Packet));
             close(fd);
@@ -153,7 +159,7 @@ int findMyself(KeyboardHandlerPacket *packet) {
 void exitCommand(KeyboardHandlerPacket *packet) {
     Packet packetSender = {EXIT};
     int myId = findMyself(packet);
-    strcpy(packetSender.content, packet->players->array[myId].name);
+    strcpy(packetSender.data.content, packet->players->array[myId].name);
     writeToPipe(*packet->motorFd, &packetSender, sizeof(Packet));
     close(*packet->motorFd);
     char buffer[20];
