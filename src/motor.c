@@ -18,8 +18,7 @@ int main(int argc, char* argv[]) {
     Map map = {};
     KeyboardHandlerPacket keyboardPacket = {&players, &map, 1};
     int motorFd;
-    int jogoUIFd[MAX_PLAYERS];
-    pthread_t tid;
+    pthread_t keyBoardHandlerThread, jogoUIHandlerThread;
     int currentLevel = 1, gameRun;
 
     //getEnvs(&inscricao, &nplayers, &duracao, &decremento);
@@ -31,10 +30,11 @@ int main(int argc, char* argv[]) {
     makePipe(JOGOUI_TO_MOTOR_PIPE);
 
     // Cria thread para tratar do teclado
-    if(pthread_create(&tid, NULL, handleKeyboard, (void*)&keyboardPacket) != 0) {
+    if(pthread_create(&keyBoardHandlerThread, NULL, handleKeyboard, (void*)&keyboardPacket) != 0) {
         PERROR("Creating thread");
         exit(EXIT_FAILURE);
     }
+    //if(pthread_create(&jogoUIHandlerThread, NULL, ))
       
     // Abre o pipe para receber dados
     motorFd = openPipeForReadingWriting(JOGOUI_TO_MOTOR_PIPE);
@@ -44,11 +44,9 @@ int main(int argc, char* argv[]) {
 
     // Envia array de Players aos Players
     for(int i = 0; i < players.nPlayers; ++i) {
-        jogoUIFd[i] = openPipeForWriting(players.array[i].pipe);
-        writeToPipe(jogoUIFd[i], &players, sizeof(PlayerArray));
+        players.playerFd[i] = openPipeForWriting(players.array[i].pipe);
+        writeToPipe(players.playerFd[i], &players, sizeof(PlayerArray));
     }
-
-    
 
     /*
     while(currentLevel < 4) {
@@ -68,7 +66,7 @@ int main(int argc, char* argv[]) {
     }
 
     */
-    if (pthread_join(tid, NULL) != 0) {
+    if (pthread_join(keyBoardHandlerThread, NULL) != 0) {
         PERROR("Join thread");
         return EXIT_FAILURE;
     }
@@ -109,6 +107,11 @@ void *handleKeyboard(void *args) {
         readCommand(commandBuffer, sizeof(commandBuffer));
         handleCommand(commandBuffer, packet);
     }
+}
+
+
+void *handleJogoUI(void *args) {
+
 }
 
 void readCommand(char *command, size_t commandSize) {

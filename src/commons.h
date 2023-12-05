@@ -27,8 +27,10 @@
 
 typedef enum {
     KICK,
-    MESSAGE
+    MESSAGE,
+    EXIT
 } MessageType;
+
 
 typedef struct {
     char name[PLAYER_NAME_SIZE];
@@ -42,6 +44,7 @@ typedef struct {
 
 typedef struct {
     Player array[MAX_PLAYERS];
+    int playerFd[MAX_PLAYERS];
     int nPlayers;
 } PlayerArray;
 
@@ -53,6 +56,7 @@ typedef struct {
     PlayerArray *players;
     Map *map;
     int keyboardFeed;
+    int motorFd;
 } KeyboardHandlerPacket;
 
 typedef struct {
