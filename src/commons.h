@@ -38,6 +38,9 @@
 #define N_WINDOWS 2
 #define KEY_SPACEBAR 32
 
+#define MAP_ROWS 16
+#define MAP_COLUMNS 80
+
 typedef enum {
     KICK,
     MESSAGE,

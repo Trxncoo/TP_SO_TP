@@ -73,6 +73,11 @@ int main(int argc, char* argv[]) {
 
     refreshAll(topWindow, bottomWindow, sideWindow);
 
+    for(int i=0; i< MAP_ROWS; i++) {
+        for(int j=0;j<MAP_COLUMNS;j++) {
+            mvwaddch(topWindow, i+1, j+1, keyboardPacket.map->array[i][j]);
+        }
+    }
 
 
     Packet packet;
@@ -80,7 +85,7 @@ int main(int argc, char* argv[]) {
         readFromPipe(jogoUIFd, &packet, sizeof(Packet));
         switch(packet.type) {
             case KICK:
-                mvprintw(sideWindow, "%s", packet.data.content);
+                mvprintw(sideWindow,2,2, "%s", packet.data.content);
                 //printf("%s\n", packet.data.content);
                 
                 close(motorFd);
@@ -89,6 +94,7 @@ int main(int argc, char* argv[]) {
                 exit(0);
 
             case MESSAGE:
+                mvprintw(sideWindow,2,2  , "%s", packet.data.content);
                 printf("%s\n", packet.data.content);
                 break;
 
