@@ -11,13 +11,14 @@ void beginCommand(KeyboardHandlerPacket *packet);
 void kickCommand(KeyboardHandlerPacket *packet, const char *name);
 void playerLobby(KeyboardHandlerPacket *keyboardPacket, PlayerArray *players, const int motorFd);
 void getEnvs(int* inscricao, int* nplayers, int* duracao, int* decremento);
+void *handleJogoUI(void *args);
 
 int main(int argc, char* argv[]) {  
     int inscricao, nplayers, duracao, decremento; //Criar variaveis de ambiente
     PlayerArray players = {};
     Map map = {};
-    KeyboardHandlerPacket keyboardPacket = {&players, &map, 1};
     int motorFd;
+    KeyboardHandlerPacket keyboardPacket = {&players, &map, 1};
     pthread_t keyBoardHandlerThread, jogoUIHandlerThread;
     int currentLevel = 1, gameRun;
 
@@ -29,15 +30,20 @@ int main(int argc, char* argv[]) {
     // Cria pipe para receber dados
     makePipe(JOGOUI_TO_MOTOR_PIPE);
 
+    
     // Cria thread para tratar do teclado
     if(pthread_create(&keyBoardHandlerThread, NULL, handleKeyboard, (void*)&keyboardPacket) != 0) {
         PERROR("Creating thread");
         exit(EXIT_FAILURE);
     }
-    //if(pthread_create(&jogoUIHandlerThread, NULL, ))
-      
-    // Abre o pipe para receber dados
+
+    if(pthread_create(&jogoUIHandlerThread, NULL, handleJogoUI, (void*)&keyboardPacket) !=0) {
+        PERROR("Creating thread");
+        exit(EXIT_FAILURE);
+    }
+      // Abre o pipe para receber dados
     motorFd = openPipeForReadingWriting(JOGOUI_TO_MOTOR_PIPE);
+    keyboardPacket.motorFd = motorFd;
     
     // Recebe Players
     playerLobby(&keyboardPacket, &players, motorFd);
@@ -111,7 +117,17 @@ void *handleKeyboard(void *args) {
 
 
 void *handleJogoUI(void *args) {
+    KeyboardHandlerPacket *packet =(KeyboardHandlerPacket*)args;
+    Packet typePacket;
+    while(1) {
+        readFromPipe(packet->motorFd, &typePacket, sizeof(Packet));
+        switch(typePacket.type) {
+            case EXIT:
+                printf("A expulsar %s\n", typePacket.content);
+                break;
 
+        }
+    }
 }
 
 void readCommand(char *command, size_t commandSize) {

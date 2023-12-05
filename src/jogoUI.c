@@ -6,6 +6,8 @@ void readCommand(char *command, size_t commandSize);
 int handleCommand(char *input, KeyboardHandlerPacket *packet);
 void msgCommand(KeyboardHandlerPacket *packet, char *arg1, char *arg2);
 void playersCommand(KeyboardHandlerPacket *packet);
+int findMyself(KeyboardHandlerPacket *packet);
+void exitCommand(KeyboardHandlerPacket *packet);
 
 int main(int argc, char* argv[]) {
     Player player = {}; 
@@ -115,9 +117,11 @@ int handleCommand(char *input, KeyboardHandlerPacket *packet) {
 		msgCommand(packet, arg1, arg2);
     } else if(!strcmp(command, "players") && nArgs == 1) {
         playersCommand(packet);
+    } else if(!strcmp(command, "exit") && nArgs == 1) {
+        exitCommand(packet);
     } else {
         printf("Comando Invalido\n");
-    }
+    } 
     return 1;
 }
 
@@ -139,8 +143,19 @@ void playersCommand(KeyboardHandlerPacket *packet) {
     }
 }
 
+int findMyself(KeyboardHandlerPacket *packet) {
+    for(int i=0; i<packet->players->nPlayers; i++) {
+        if(getpid() == packet->players->array[i].pid) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 void exitCommand(KeyboardHandlerPacket *packet) {
-    Packet packetSender = {EXIT, "Closing jogoUI\n"};
+    Packet packetSender = {EXIT};
+    int myId = findMyself(packet);
+    strcpy(packetSender.content, packet->players->array[myId].name);
     writeToPipe(packet->motorFd, &packetSender, sizeof(Packet));
     close(packet->motorFd);
     char buffer[20];
