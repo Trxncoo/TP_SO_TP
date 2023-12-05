@@ -9,7 +9,8 @@ void playersCommand(KeyboardHandlerPacket *packet);
 int findMyself(KeyboardHandlerPacket *packet);
 void exitCommand(KeyboardHandlerPacket *packet);
 void initScreen();
-void drawBorder(WINDOW *topWindow, WINDOW *bottomWindow);
+void drawBorder(WINDOW *topWindow, WINDOW *bottomWindow, WINDOW* sideWindow);
+void refreshAll(WINDOW* topWindow, WINDOW* bottomWindow, WINDOW* sideWindow);
 
 int main(int argc, char* argv[]) {
     Player player = {}; 
@@ -63,16 +64,14 @@ int main(int argc, char* argv[]) {
 
     WINDOW *topWindow = newwin(TOP_SCREEN_HEIGTH, TOP_SCREEN_WIDTH, 0, (COLS - TOP_SCREEN_WIDTH) / 2);
     WINDOW *bottomWindow= newwin(BOTTOM_SCREEN_HEIGTH, BOTTOM_SCREEN_WIDTH, (TOP_SCREEN_HEIGTH + PADDING), (COLS - BOTTOM_SCREEN_WIDTH) / 2);
-    WINDOW* sideWindow = newwin(10,10,20,20);
+    WINDOW *sideWindow = newwin(30,30,10,10);
     WINDOW *windows[N_WINDOWS] = {topWindow, bottomWindow};
-    drawBorder(topWindow, bottomWindow);
-    wborder(sideWindow, '|', '|', '-', '-', '+', '+', '+', '+');
+    drawBorder(topWindow, bottomWindow, sideWindow);
     
     ungetch('.');
     getch();  
 
-    wrefresh(topWindow);
-    wrefresh(bottomWindow);
+    refreshAll(topWindow, bottomWindow, sideWindow);
 
 
 
@@ -81,7 +80,8 @@ int main(int argc, char* argv[]) {
         readFromPipe(jogoUIFd, &packet, sizeof(Packet));
         switch(packet.type) {
             case KICK:
-                printf("%s\n", packet.data.content);
+                mvprintw(sideWindow, "%s", packet.data.content);
+                //printf("%s\n", packet.data.content);
                 
                 close(motorFd);
                 close(jogoUIFd);
@@ -201,7 +201,15 @@ void exitCommand(KeyboardHandlerPacket *packet) {
     curs_set(0);
 }
 
-void drawBorder(WINDOW *topWindow, WINDOW *bottomWindow) {
+void drawBorder(WINDOW *topWindow, WINDOW *bottomWindow, WINDOW* sideWindow) {
     wborder(topWindow, '|', '|', '-', '-', '+', '+', '+', '+');
     wborder(bottomWindow, '|', '|', '-', '-', '+', '+', '+', '+');
+    wborder(sideWindow, '|', '|', '-', '-', '+', '+', '+', '+');
+
+}
+
+void refreshAll(WINDOW* topWindow, WINDOW* bottomWindow, WINDOW* sideWindow) {
+    wrefresh(topWindow);
+    wrefresh(bottomWindow);
+    wrefresh(sideWindow);
 }
