@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
     PlayerArray players = {};
     Map map = {};
     int motorFd;
-    KeyboardHandlerPacket keyboardPacket = {&players, &map, 1};
+    KeyboardHandlerPacket keyboardPacket = {&players, &map, 1, &motorFd};
     pthread_t keyBoardHandlerThread, jogoUIHandlerThread;
     int currentLevel = 1, gameRun;
 
@@ -37,16 +37,16 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 
+      // Abre o pipe para receber dados
+    motorFd = openPipeForReadingWriting(JOGOUI_TO_MOTOR_PIPE);
+    
+    // Recebe Players
+    playerLobby(&keyboardPacket, &players, motorFd);
+
     if(pthread_create(&jogoUIHandlerThread, NULL, handleJogoUI, (void*)&keyboardPacket) !=0) {
         PERROR("Creating thread");
         exit(EXIT_FAILURE);
     }
-      // Abre o pipe para receber dados
-    motorFd = openPipeForReadingWriting(JOGOUI_TO_MOTOR_PIPE);
-    keyboardPacket.motorFd = motorFd;
-    
-    // Recebe Players
-    playerLobby(&keyboardPacket, &players, motorFd);
 
     // Envia array de Players aos Players
     for(int i = 0; i < players.nPlayers; ++i) {
@@ -120,7 +120,7 @@ void *handleJogoUI(void *args) {
     KeyboardHandlerPacket *packet =(KeyboardHandlerPacket*)args;
     Packet typePacket;
     while(1) {
-        readFromPipe(packet->motorFd, &typePacket, sizeof(Packet));
+        readFromPipe(*packet->motorFd, &typePacket, sizeof(Packet));
         switch(typePacket.type) {
             case EXIT:
                 printf("A expulsar %s\n", typePacket.content);

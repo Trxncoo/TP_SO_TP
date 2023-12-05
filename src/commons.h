@@ -56,7 +56,7 @@ typedef struct {
     PlayerArray *players;
     Map *map;
     int keyboardFeed;
-    int motorFd;
+    int *motorFd;
 } KeyboardHandlerPacket;
 
 typedef struct {

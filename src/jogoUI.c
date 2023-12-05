@@ -13,12 +13,11 @@ int main(int argc, char* argv[]) {
     Player player = {}; 
     PlayerArray players = {};
     Map map = {};
-    KeyboardHandlerPacket keyboardPacket = {&players, &map, 1};
-    pthread_t tid;
     int jogoUIFd, motorFd;
+    KeyboardHandlerPacket keyboardPacket = {&players, &map, 1, &motorFd};
+    pthread_t tid;
     int confirmationFlag = 0;
 
-    
     // Prepara "Ctrl C"
     setupSigIntJogoUI();
 
@@ -35,7 +34,6 @@ int main(int argc, char* argv[]) {
 
     // Abre o pipe para enviar dados ao motor e envia o seu nome
     motorFd = openPipeForWriting(JOGOUI_TO_MOTOR_PIPE);
-    keyboardPacket.motorFd = motorFd;
     writeToPipe(motorFd, &player, sizeof(Player));
 
     // Recebe confirmacao do motor
@@ -156,8 +154,8 @@ void exitCommand(KeyboardHandlerPacket *packet) {
     Packet packetSender = {EXIT};
     int myId = findMyself(packet);
     strcpy(packetSender.content, packet->players->array[myId].name);
-    writeToPipe(packet->motorFd, &packetSender, sizeof(Packet));
-    close(packet->motorFd);
+    writeToPipe(*packet->motorFd, &packetSender, sizeof(Packet));
+    close(*packet->motorFd);
     char buffer[20];
     sprintf(buffer, MOTOR_TO_JOGOUI_PIPE, getpid());
     unlink(buffer);
