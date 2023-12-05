@@ -8,6 +8,8 @@ void msgCommand(KeyboardHandlerPacket *packet, char *arg1, char *arg2);
 void playersCommand(KeyboardHandlerPacket *packet);
 int findMyself(KeyboardHandlerPacket *packet);
 void exitCommand(KeyboardHandlerPacket *packet);
+void initScreen();
+void drawBorder(WINDOW *topWindow, WINDOW *bottomWindow);
 
 int main(int argc, char* argv[]) {
     Player player = {}; 
@@ -52,12 +54,35 @@ int main(int argc, char* argv[]) {
         printf("Nome: %s\n", players.array[i].name);
     }
 
+
+    printf("clique nalguma tecla para entrar no loop principal\n");
+
+    //getchar();
+
+    initScreen();
+
+    WINDOW *topWindow = newwin(TOP_SCREEN_HEIGTH, TOP_SCREEN_WIDTH, 0, (COLS - TOP_SCREEN_WIDTH) / 2);
+    WINDOW *bottomWindow= newwin(BOTTOM_SCREEN_HEIGTH, BOTTOM_SCREEN_WIDTH, (TOP_SCREEN_HEIGTH + PADDING), (COLS - BOTTOM_SCREEN_WIDTH) / 2);
+    WINDOW* sideWindow = newwin(10,10,20,20);
+    WINDOW *windows[N_WINDOWS] = {topWindow, bottomWindow};
+    drawBorder(topWindow, bottomWindow);
+    wborder(sideWindow, '|', '|', '-', '-', '+', '+', '+', '+');
+    
+    ungetch('.');
+    getch();  
+
+    wrefresh(topWindow);
+    wrefresh(bottomWindow);
+
+
+
     Packet packet;
     while(1) {
         readFromPipe(jogoUIFd, &packet, sizeof(Packet));
         switch(packet.type) {
             case KICK:
                 printf("%s\n", packet.data.content);
+                
                 close(motorFd);
                 close(jogoUIFd);
                 unlink(player.pipe);
@@ -166,4 +191,17 @@ void exitCommand(KeyboardHandlerPacket *packet) {
     sprintf(buffer, MOTOR_TO_JOGOUI_PIPE, getpid());
     unlink(buffer);
     exit(0);
+}
+
+ void initScreen() {
+    initscr();
+    cbreak();
+    noecho();
+    keypad(stdscr, TRUE);
+    curs_set(0);
+}
+
+void drawBorder(WINDOW *topWindow, WINDOW *bottomWindow) {
+    wborder(topWindow, '|', '|', '-', '-', '+', '+', '+', '+');
+    wborder(bottomWindow, '|', '|', '-', '-', '+', '+', '+', '+');
 }
