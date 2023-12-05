@@ -1,4 +1,5 @@
 #include "communication.h"
+#include "cursesHelpers.h"
 
 void initPlayer(Player* player, const int argc, char* argv[]);
 void *handleKeyboard(void *args);
@@ -8,7 +9,7 @@ void msgCommand(KeyboardHandlerPacket *packet, char *arg1, char *arg2);
 void playersCommand(KeyboardHandlerPacket *packet);
 int findMyself(KeyboardHandlerPacket *packet);
 void exitCommand(KeyboardHandlerPacket *packet);
-void initScreen();
+//void initScreen();
 //void drawBorder(WINDOW *topWindow, WINDOW *bottomWindow, WINDOW* sideWindow);
 void refreshAll(WINDOW* topWindow, WINDOW* bottomWindow, WINDOW* sideWindow);
 
@@ -66,9 +67,9 @@ int main(int argc, char* argv[]) {
     WINDOW *bottomWindow= newwin(BOTTOM_SCREEN_HEIGTH, BOTTOM_SCREEN_WIDTH, (TOP_SCREEN_HEIGTH + PADDING), (COLS - BOTTOM_SCREEN_WIDTH) / 2);
     WINDOW *sideWindow = newwin(30,30,10,10);
     WINDOW *windows[N_WINDOWS] = {topWindow, bottomWindow};
-    drawBorder(topWindow);
-    drawBorder(bottomWindow);
-    drawBorder(sideWindow);
+    box(topWindow, 0, 0);
+    box(bottomWindow, 0, 0);
+    box(sideWindow, 0, 0);
         
     ungetch('.');
     getch();  
@@ -196,20 +197,6 @@ void exitCommand(KeyboardHandlerPacket *packet) {
     exit(0);
 }
 
- void initScreen() {
-    initscr();
-    cbreak();
-    noecho();
-    keypad(stdscr, TRUE);
-    curs_set(0);
-}
-
-//void drawBorder(WINDOW *topWindow, WINDOW *bottomWindow, WINDOW* sideWindow) {
-//    wborder(topWindow, '|', '|', '-', '-', '+', '+', '+', '+');
-//    wborder(bottomWindow, '|', '|', '-', '-', '+', '+', '+', '+');
-//    wborder(sideWindow, '|', '|', '-', '-', '+', '+', '+', '+');
-//
-//}
 
 void refreshAll(WINDOW* topWindow, WINDOW* bottomWindow, WINDOW* sideWindow) {
     wrefresh(topWindow);

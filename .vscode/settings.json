@@ -1,6 +1,8 @@
 {
     "files.associations": {
-        "communication.h": "c"
+        "communication.h": "c",
+        "commons.h": "c",
+        "curseshelpers.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

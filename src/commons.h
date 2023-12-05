@@ -10,9 +10,6 @@
 #include <string.h>
 #include <signal.h>
 #include <pthread.h>
-#include <ncurses.h>
-
-#include "cursesHelpers.h"
 
 #define PRINT(...)  fprintf(__VA_ARGS__)
 #define FORMAT(X)   "<ERROR> " X "\n"
@@ -26,22 +23,7 @@
 #define MAX_PIPE_SIZE 12
 #define COMMAND_MAX_HEIGHT 10
 #define COMMAND_MAX_WIDTH 60
-#define PADDING 2
 
-#define STRING_SIZE 20
-#define TOP_SCREEN_HEIGTH 18
-#define TOP_SCREEN_WIDTH 41*2
-#define BOTTOM_SCREEN_HEIGTH 10
-#define BOTTOM_SCREEN_WIDTH  30*2
-#define COMMAND_LINE_X 5
-#define COMMAND_LINE_Y BOTTOM_SCREEN_HEIGTH - 2
-#define PADDING 1
-#define AVOYDABLES_SIZE 4 
-#define N_WINDOWS 2
-#define KEY_SPACEBAR 32
-
-#define MAP_ROWS 16
-#define MAP_COLUMNS 80
 
 typedef enum {
     KICK,
@@ -92,5 +74,8 @@ typedef struct {
     MessageType type;
     union Data data;
 } Packet;
+
+
+
 
 #endif
