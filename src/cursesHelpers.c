@@ -8,9 +8,9 @@ void initScreen() {
     curs_set(0);
 }
 
-void drawBorder(WINDOW *window) {
-    wborder(window, '|', '|', '-', '-', '+', '+', '+', '+');
-}
+ void drawBorder(WINDOW *window) {
+     wborder(window, '|', '|', '-', '-', '+', '+', '+', '+');
+ }
 
 void printMap(WINDOW *mapWindow, Map *map) {
     for (int i = 0; i < MAX_HEIGHT; ++i) {

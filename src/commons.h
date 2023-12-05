@@ -12,6 +12,8 @@
 #include <pthread.h>
 #include <ncurses.h>
 
+#include "cursesHelpers.h"
+
 #define PRINT(...)  fprintf(__VA_ARGS__)
 #define FORMAT(X)   "<ERROR> " X "\n"
 #define PERROR(X)   PRINT(stderr, FORMAT(X))

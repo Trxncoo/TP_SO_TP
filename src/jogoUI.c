@@ -9,7 +9,7 @@ void playersCommand(KeyboardHandlerPacket *packet);
 int findMyself(KeyboardHandlerPacket *packet);
 void exitCommand(KeyboardHandlerPacket *packet);
 void initScreen();
-void drawBorder(WINDOW *topWindow, WINDOW *bottomWindow, WINDOW* sideWindow);
+//void drawBorder(WINDOW *topWindow, WINDOW *bottomWindow, WINDOW* sideWindow);
 void refreshAll(WINDOW* topWindow, WINDOW* bottomWindow, WINDOW* sideWindow);
 
 int main(int argc, char* argv[]) {
@@ -66,19 +66,16 @@ int main(int argc, char* argv[]) {
     WINDOW *bottomWindow= newwin(BOTTOM_SCREEN_HEIGTH, BOTTOM_SCREEN_WIDTH, (TOP_SCREEN_HEIGTH + PADDING), (COLS - BOTTOM_SCREEN_WIDTH) / 2);
     WINDOW *sideWindow = newwin(30,30,10,10);
     WINDOW *windows[N_WINDOWS] = {topWindow, bottomWindow};
-    drawBorder(topWindow, bottomWindow, sideWindow);
-    
+    drawBorder(topWindow);
+    drawBorder(bottomWindow);
+    drawBorder(sideWindow);
+        
     ungetch('.');
     getch();  
 
     refreshAll(topWindow, bottomWindow, sideWindow);
 
-    for(int i=0; i< MAP_ROWS; i++) {
-        for(int j=0;j<MAP_COLUMNS;j++) {
-            mvwaddch(topWindow, i+1, j+1, keyboardPacket.map->array[i][j]);
-        }
-    }
-
+    printMap(topWindow, keyboardPacket.map);
 
     Packet packet;
     while(1) {
@@ -207,12 +204,12 @@ void exitCommand(KeyboardHandlerPacket *packet) {
     curs_set(0);
 }
 
-void drawBorder(WINDOW *topWindow, WINDOW *bottomWindow, WINDOW* sideWindow) {
-    wborder(topWindow, '|', '|', '-', '-', '+', '+', '+', '+');
-    wborder(bottomWindow, '|', '|', '-', '-', '+', '+', '+', '+');
-    wborder(sideWindow, '|', '|', '-', '-', '+', '+', '+', '+');
-
-}
+//void drawBorder(WINDOW *topWindow, WINDOW *bottomWindow, WINDOW* sideWindow) {
+//    wborder(topWindow, '|', '|', '-', '-', '+', '+', '+', '+');
+//    wborder(bottomWindow, '|', '|', '-', '-', '+', '+', '+', '+');
+//    wborder(sideWindow, '|', '|', '-', '-', '+', '+', '+', '+');
+//
+//}
 
 void refreshAll(WINDOW* topWindow, WINDOW* bottomWindow, WINDOW* sideWindow) {
     wrefresh(topWindow);

@@ -4,6 +4,7 @@
 #include "ncurses.h"
 #include "commons.h"
 
+
 void initScreen();
 void drawBorder(WINDOW *window);
 void printMap(WINDOW *mapWindow, Map *map);

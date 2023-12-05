@@ -1,6 +1,7 @@
 #include "communication.h"
 #include "cursesHelpers.h"
 
+
 int isNameAvailable(const PlayerArray *players, const char *name);
 void readMapFromFile(char map[MAX_HEIGHT][MAX_WIDTH], const char *filename);
 void *handleKeyboard(void *args);
