@@ -9,9 +9,6 @@ void msgCommand(KeyboardHandlerPacket *packet, char *arg1, char *arg2);
 void playersCommand(KeyboardHandlerPacket *packet);
 int findMyself(KeyboardHandlerPacket *packet);
 void exitCommand(KeyboardHandlerPacket *packet);
-//void initScreen();
-//void drawBorder(WINDOW *topWindow, WINDOW *bottomWindow, WINDOW* sideWindow);
-void refreshAll(WINDOW* topWindow, WINDOW* bottomWindow, WINDOW* sideWindow);
 
 int main(int argc, char* argv[]) {
     Player player = {}; 
@@ -51,20 +48,11 @@ int main(int argc, char* argv[]) {
 
     // Recebe Array de Players do motor
     readFromPipe(jogoUIFd, &players, sizeof(PlayerArray));
-    
-    for(int i = 0; i < players.nPlayers; ++i) {
-        printf("Nome: %s\n", players.array[i].name);
-    }
-
-
-    printf("clique nalguma tecla para entrar no loop principal\n");
-
-    //getchar();
 
     initScreen();
 
-    WINDOW *topWindow = newwin(TOP_SCREEN_HEIGTH, TOP_SCREEN_WIDTH, 0, (COLS - TOP_SCREEN_WIDTH) / 2);
-    WINDOW *bottomWindow= newwin(BOTTOM_SCREEN_HEIGTH, BOTTOM_SCREEN_WIDTH, (TOP_SCREEN_HEIGTH + PADDING), (COLS - BOTTOM_SCREEN_WIDTH) / 2);
+    WINDOW *topWindow = newwin(MAX_HEIGHT + 2, MAX_WIDTH + 2, 0, (COLS - MAX_WIDTH + 2) / 2);
+    WINDOW *bottomWindow= newwin(COMMAND_MAX_HEIGHT, COMMAND_MAX_WIDTH, (MAX_HEIGHT + PADDING), (COLS - COMMAND_MAX_WIDTH) / 2);
     WINDOW *sideWindow = newwin(30,30,10,10);
     WINDOW *windows[N_WINDOWS] = {topWindow, bottomWindow};
     box(topWindow, 0, 0);
@@ -75,15 +63,13 @@ int main(int argc, char* argv[]) {
     getch();  
 
     refreshAll(topWindow, bottomWindow, sideWindow);
-
-    printMap(topWindow, keyboardPacket.map);
-
+    
     Packet packet;
     while(1) {
         readFromPipe(jogoUIFd, &packet, sizeof(Packet));
         switch(packet.type) {
             case KICK:
-                mvprintw(sideWindow,2,2, "%s", packet.data.content);
+                mvwprintw(sideWindow,2,2, "%s", packet.data.content);
                 //printf("%s\n", packet.data.content);
                 
                 close(motorFd);
@@ -92,7 +78,7 @@ int main(int argc, char* argv[]) {
                 exit(0);
 
             case MESSAGE:
-                mvprintw(sideWindow,2,2  , "%s", packet.data.content);
+                mvwprintw(sideWindow,2,2  , "%s", packet.data.content);
                 printf("%s\n", packet.data.content);
                 break;
 
@@ -195,11 +181,4 @@ void exitCommand(KeyboardHandlerPacket *packet) {
     sprintf(buffer, MOTOR_TO_JOGOUI_PIPE, getpid());
     unlink(buffer);
     exit(0);
-}
-
-
-void refreshAll(WINDOW* topWindow, WINDOW* bottomWindow, WINDOW* sideWindow) {
-    wrefresh(topWindow);
-    wrefresh(bottomWindow);
-    wrefresh(sideWindow);
 }

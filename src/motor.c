@@ -3,7 +3,7 @@
 
 
 int isNameAvailable(const PlayerArray *players, const char *name);
-void readMapFromFile(char map[MAX_HEIGHT][MAX_WIDTH], const char *filename);
+void readMapFromFile(Map *map, const char *filename);
 void *handleKeyboard(void *args);
 void readCommand(char* command, size_t commandSize);
 int handleCommand(char *input, KeyboardHandlerPacket *packet);
@@ -55,6 +55,22 @@ int main(int argc, char* argv[]) {
         writeToPipe(players.playerFd[i], &players, sizeof(PlayerArray));
     }
 
+    initScreen();
+
+    WINDOW *topWindow = newwin(MAX_HEIGHT + 2, MAX_WIDTH + 1, PADDING, (COLS - MAX_WIDTH) / 2);
+    WINDOW *bottomWindow= newwin(COMMAND_MAX_HEIGHT, COMMAND_MAX_WIDTH, (MAX_HEIGHT + 2 + PADDING), (COLS - COMMAND_MAX_WIDTH + 1) / 2);
+    WINDOW *sideWindow = newwin(30,30,10,10);
+    WINDOW *windows[N_WINDOWS] = {topWindow, bottomWindow};
+    box(topWindow, 0, 0);
+    box(bottomWindow, 0, 0);
+    box(sideWindow, 0, 0);
+        
+    ungetch('.');
+    getch();  
+
+    refreshAll(topWindow, bottomWindow, sideWindow);
+    readMapFromFile(&map, "map.txt");
+    printMap(topWindow, &map);
     /*
     while(currentLevel < 4) {
         //sendMap
@@ -91,7 +107,7 @@ int isNameAvailable(const PlayerArray *players, const char *name) {
     return 1;
 }
 
-void readMapFromFile(char map[MAX_HEIGHT][MAX_WIDTH], const char *filename) {
+void readMapFromFile(Map *map, const char *filename) {
     int fd = open(filename, O_RDONLY);
     if (fd == -1) {
         PERROR("open");
@@ -100,7 +116,7 @@ void readMapFromFile(char map[MAX_HEIGHT][MAX_WIDTH], const char *filename) {
 
     for(int i = 0; i < MAX_HEIGHT; ++i) {
         for(int j = 0; j < MAX_WIDTH; ++j) {
-            int nRead = read(fd, &map[i][j], sizeof(char));
+            int nRead = read(fd, &map->array[i][j], sizeof(char));
         }
     }
     

@@ -17,3 +17,9 @@ void printMap(WINDOW *mapWindow, Map *map) {
     }
     wrefresh(mapWindow);
 }
+
+void refreshAll(WINDOW* topWindow, WINDOW* bottomWindow, WINDOW* sideWindow) {
+    wrefresh(topWindow);
+    wrefresh(bottomWindow);
+    wrefresh(sideWindow);
+}

@@ -15,15 +15,12 @@
 #define FORMAT(X)   "<ERROR> " X "\n"
 #define PERROR(X)   PRINT(stderr, FORMAT(X))
 
-#define PLAYER_NAME_SIZE 20
-#define MAX_PLAYERS 5
 #define MAX_HEIGHT 16
 #define MAX_WIDTH 81
+#define PLAYER_NAME_SIZE 20
+#define MAX_PLAYERS 5
 #define COMMAND_BUFFER_SIZE 80
 #define MAX_PIPE_SIZE 12
-#define COMMAND_MAX_HEIGHT 10
-#define COMMAND_MAX_WIDTH 60
-
 
 typedef enum {
     KICK,
