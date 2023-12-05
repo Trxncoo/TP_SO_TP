@@ -35,9 +35,12 @@ int main(int argc, char* argv[]) {
     // Recebe Array de Players do motor
     readFromPipe(jogoUIFd, &players, sizeof(PlayerArray));
     
+    for(int i = 0; i < players.nPlayers; ++i) {
+        printf("Nome: %s\n", players.array[i].name);
+    }
+
     Packet packet;
     while(1) {
-        printf("Here i go\n"); fflush(stdout);
         readFromPipe(jogoUIFd, &packet, sizeof(Packet));
         switch(packet.type) {
             case KICK:
