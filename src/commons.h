@@ -55,6 +55,7 @@ typedef struct {
     Map *map;
     int keyboardFeed;
     int *motorFd;
+    int *jogoUIFd;
 } KeyboardHandlerPacket;
 
 typedef struct {

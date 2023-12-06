@@ -1,7 +1,9 @@
 #include "communication.h"
 #include "cursesHelpers.h"
 
+void initJogoUI(Player* player, const int argc, char* argv[]);
 void initPlayer(Player* player, const int argc, char* argv[]);
+void registerUser(int *motorFd, int *jogoUIFd, Player *player);
 void *handleKeyboard(void *args);
 void readCommand(char *command, size_t commandSize);
 int handleCommand(char *input, KeyboardHandlerPacket *packet);
@@ -9,46 +11,25 @@ void msgCommand(KeyboardHandlerPacket *packet, char *arg1, char *arg2);
 void playersCommand(KeyboardHandlerPacket *packet);
 int findMyself(KeyboardHandlerPacket *packet);
 void exitCommand(KeyboardHandlerPacket *packet);
+void *handleEvents(void *args);
 
 int main(int argc, char* argv[]) {
     Player player = {}; 
     PlayerArray players = {};
     Map map = {};
     int jogoUIFd, motorFd;
-    KeyboardHandlerPacket keyboardPacket = {&players, &map, 1, &motorFd};
-    pthread_t tid;
-    int confirmationFlag = 0;
+    KeyboardHandlerPacket keyboardPacket = {&players, &map, 1, &motorFd, &jogoUIFd};
+    pthread_t eventHandler;
 
-    // Prepara "Ctrl C"
-    setupSigIntJogoUI();
+    initJogoUI(&player, argc, argv);
 
-    // Inicializa Players
-    initPlayer(&player, argc, argv);
+    registerUser(&motorFd, &jogoUIFd, &player);
 
-    // Cria o pipe para receber dados
-    makePipe(player.pipe);
-
-    if(pthread_create(&tid, NULL, handleKeyboard, (void*)&keyboardPacket) != 0) {
+    if(pthread_create(&eventHandler, NULL, handleEvents, (void*)&keyboardPacket)) {
         PERROR("Creating thread");
         exit(EXIT_FAILURE);
     }
-
-    // Abre o pipe para enviar dados ao motor e envia o seu nome
-    motorFd = openPipeForWriting(JOGOUI_TO_MOTOR_PIPE);
-    writeToPipe(motorFd, &player, sizeof(Player));
-
-    // Recebe confirmacao do motor
-    jogoUIFd = openPipeForReading(player.pipe);
-    readFromPipe(jogoUIFd, &confirmationFlag, sizeof(int));
-    if(confirmationFlag) {
-        printf("Nome disponivel, vai jogar\n");
-    } else {
-        printf("Nome ja existe, registado como espetador\n");
-    }
-
-    // Recebe Array de Players do motor
-    readFromPipe(jogoUIFd, &players, sizeof(PlayerArray));
-
+/*
     initScreen();
 
     WINDOW *topWindow = newwin(MAX_HEIGHT + 2, MAX_WIDTH + 2, 0, (COLS - MAX_WIDTH + 2) / 2);
@@ -63,39 +44,79 @@ int main(int argc, char* argv[]) {
     getch();  
 
     refreshAll(topWindow, bottomWindow, sideWindow);
-    
-    Packet packet;
+*/
+    char commandBuffer[COMMAND_BUFFER_SIZE];
     while(1) {
-        readFromPipe(jogoUIFd, &packet, sizeof(Packet));
-        switch(packet.type) {
-            case KICK:
-                mvwprintw(sideWindow,2,2, "%s", packet.data.content);
-                //printf("%s\n", packet.data.content);
-                
-                close(motorFd);
-                close(jogoUIFd);
-                unlink(player.pipe);
-                exit(0);
+        readCommand(commandBuffer, sizeof(commandBuffer));
+        handleCommand(commandBuffer, &keyboardPacket);
+    }
 
-            case MESSAGE:
-                mvwprintw(sideWindow,2,2  , "%s", packet.data.content);
-                printf("%s\n", packet.data.content);
-                break;
-
-            case SYNC:
-                players = packet.data.syncPacket.players;
-                printf("NUmero de players:%d\n", players.nPlayers);
-                break;
-
-            default:
-                break;
-        }
+    if(pthread_join(eventHandler, NULL) != 0) {
+        PERROR("Join thread");
+        return EXIT_FAILURE;
     }
     
     close(motorFd);
     close(jogoUIFd);
     unlink(player.pipe);
     return 0;
+}
+
+void *handleEvents(void *args) {
+    KeyboardHandlerPacket *eventPacket = (KeyboardHandlerPacket*)args;
+    Packet packet;
+    while(1) {
+        int myId = findMyself(eventPacket);
+        readFromPipe(*(eventPacket->jogoUIFd), &packet, sizeof(Packet));
+        switch(packet.type) {
+            case KICK:
+                printf("%s\n", packet.data.content);
+                
+                close(*(eventPacket->motorFd));
+                close(*(eventPacket->jogoUIFd));
+                unlink(eventPacket->players->array[myId].pipe);
+                exit(0);
+
+            case MESSAGE:
+                printf("%s\n", packet.data.content);
+                break;
+
+            case SYNC:
+                *(eventPacket->players) = packet.data.syncPacket.players;
+                for(int i = 0; i < eventPacket->players->nPlayers; ++i) {
+                    printf("%s\n", eventPacket->players->array[i].name);
+                }
+                break;
+
+            default:
+                break;
+        }
+    }
+}
+
+void registerUser(int *motorFd, int *jogoUIFd, Player *player) {
+    int confirmationFlag = 0;
+    *motorFd = openPipeForWriting(JOGOUI_TO_MOTOR_PIPE);
+    writeToPipe(*motorFd, player, sizeof(Player));
+
+    *jogoUIFd = openPipeForReading(player->pipe);
+    readFromPipe(*jogoUIFd, &confirmationFlag, sizeof(int));
+    if(confirmationFlag) {
+        printf("Nome disponivel, vai jogar\n");
+    } else {
+        printf("Nome ja existe, registado como espetador\n");
+    }
+}
+
+void initJogoUI(Player* player, const int argc, char* argv[]) {
+    // Prepara "Ctrl C"
+    setupSigIntJogoUI();
+
+    // Inicializa Players
+    initPlayer(player, argc, argv);
+
+    // Cria o pipe para receber dados
+    makePipe(player->pipe);
 }
 
 void initPlayer(Player* player, const int argc, char* argv[]) {

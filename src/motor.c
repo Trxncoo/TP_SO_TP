@@ -1,13 +1,13 @@
 #include "communication.h"
 #include "cursesHelpers.h"
 
-
+void initMotor(int *motorFd, int *inscricao, int *nplayers, int *duracao, int *decremento);
 int isNameAvailable(const PlayerArray *players, const char *name);
 void readMapFromFile(Map *map, const char *filename);
 void *handleKeyboard(void *args);
 void readCommand(char* command, size_t commandSize);
-int handleCommand(char *input, KeyboardHandlerPacket *packet, WINDOW* window);
-void usersCommand(KeyboardHandlerPacket *packet, WINDOW* window);
+int handleCommand(char *input, KeyboardHandlerPacket *packet);
+void usersCommand(KeyboardHandlerPacket *packet);
 void beginCommand(KeyboardHandlerPacket *packet);
 void kickCommand(KeyboardHandlerPacket *packet, const char *name);
 void playerLobby(KeyboardHandlerPacket *keyboardPacket, PlayerArray *players, const int motorFd);
@@ -15,47 +15,41 @@ void getEnvs(int* inscricao, int* nplayers, int* duracao, int* decremento);
 void *handleJogoUI(void *args);
 void setupCommand(WINDOW* bottomWindow);
 
+
+
 int main(int argc, char* argv[]) {  
     int inscricao, nplayers, duracao, decremento; //Criar variaveis de ambiente
     PlayerArray players = {};
     Map map = {};
     int motorFd;
     KeyboardHandlerPacket keyboardPacket = {&players, &map, 1, &motorFd};
-    pthread_t keyBoardHandlerThread, jogoUIHandlerThread;
+    pthread_t keyBoardHandlerThread, eventHandler;
     int currentLevel = 1, gameRun;
 
-    //getEnvs(&inscricao, &nplayers, &duracao, &decremento);
-
-    // Prepara "Ctrl c"
-    setupSigIntMotor();
-
-    // Cria pipe para receber dados
-    makePipe(JOGOUI_TO_MOTOR_PIPE);
-
+    initMotor(&motorFd, &inscricao, &nplayers, &duracao, &decremento);
     
-    // Cria thread para tratar do teclado
     if(pthread_create(&keyBoardHandlerThread, NULL, handleKeyboard, (void*)&keyboardPacket) != 0) {
         PERROR("Creating thread");
         exit(EXIT_FAILURE);
     }
-
-      // Abre o pipe para receber dados
-    motorFd = openPipeForReadingWriting(JOGOUI_TO_MOTOR_PIPE);
     
-    // Recebe Players
     playerLobby(&keyboardPacket, &players, motorFd);
 
-    if(pthread_create(&jogoUIHandlerThread, NULL, handleJogoUI, (void*)&keyboardPacket) !=0) {
+    if(pthread_create(&eventHandler, NULL, handleJogoUI, (void*)&keyboardPacket) !=0) {
         PERROR("Creating thread");
         exit(EXIT_FAILURE);
     }
 
-    // Envia array de Players aos Players
+    SynchronizePacket syncPacket = {players, map};
+    Packet packet;
+    packet.type = SYNC;
+    packet.data.syncPacket = syncPacket;
     for(int i = 0; i < players.nPlayers; ++i) {
         players.playerFd[i] = openPipeForWriting(players.array[i].pipe);
-        writeToPipe(players.playerFd[i], &players, sizeof(PlayerArray));
+        writeToPipe(players.playerFd[i], &packet, sizeof(Packet));
     }
 
+    /*
     initScreen();
 
     WINDOW *topWindow = newwin(MAX_HEIGHT + 2, MAX_WIDTH + 1, PADDING, (COLS - MAX_WIDTH) / 2);
@@ -90,24 +84,10 @@ int main(int argc, char* argv[]) {
 
         //mvwprintw(bottomWindow, 3, 3, "%s", command);
     }
-    /*
-    while(currentLevel < 4) {
-        //sendMap
-        readMapFromFile(map.array, "map.txt");
-        for(int i = 0; i < players.nPlayers; ++i) {
-            int fd = openPipeForWriting(players.array->pipe);
-            writeToPipe(fd, &map, sizeof(Map));
-            close(fd);
-        }
-        //initLocations
-        gameRun = 1;
-
-        while(gameRun) {
-
-        }
-    }
 
     */
+    
+    
     if (pthread_join(keyBoardHandlerThread, NULL) != 0) {
         PERROR("Join thread");
         return EXIT_FAILURE;
@@ -115,6 +95,17 @@ int main(int argc, char* argv[]) {
 
     unlink(JOGOUI_TO_MOTOR_PIPE);
     return 0;
+}
+
+void initMotor(int *motorFd, int *inscricao, int *nplayers, int *duracao, int *decremento) {
+
+    //getEnvs(&inscricao, &nplayers, &duracao, &decremento);
+
+    setupSigIntMotor();
+
+    makePipe(JOGOUI_TO_MOTOR_PIPE);
+
+    *motorFd = openPipeForReadingWriting(JOGOUI_TO_MOTOR_PIPE);
 }
 
 int isNameAvailable(const PlayerArray *players, const char *name) {
@@ -185,14 +176,14 @@ void readCommand(char *command, size_t commandSize) {
     command[strcspn(command, "\n")] = 0;
 }
 
-int handleCommand(char *input, KeyboardHandlerPacket *packet, WINDOW* window) {
+int handleCommand(char *input, KeyboardHandlerPacket *packet) {
 	char command[COMMAND_BUFFER_SIZE];
     char arg1[COMMAND_BUFFER_SIZE];
 
     int numArgs = sscanf(input, "%s %s", command, arg1);
 
     if (strcmp(command, "users") == 0 && numArgs == 1) {
-		usersCommand(packet, window);
+		usersCommand(packet);
     } else if(strcmp(command, "begin") == 0 && numArgs == 1) {
         beginCommand(packet);
     } else if(!strcmp(command, "kick") && numArgs == 2) {
@@ -201,11 +192,10 @@ int handleCommand(char *input, KeyboardHandlerPacket *packet, WINDOW* window) {
     return 1;
 }
 
-void usersCommand(KeyboardHandlerPacket *packet,WINDOW* window) {
+void usersCommand(KeyboardHandlerPacket *packet) {
     printf("User List:\n");
     for(int i = 0; i < packet->players->nPlayers; ++i) {
         printf("\t<%s>\n", packet->players->array[i].name);
-        mvwprintw(window, 3,0, "\t<%s>\n", packet->players->array[i].name);
     }
 }
 
