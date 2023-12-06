@@ -6,8 +6,8 @@ int isNameAvailable(const PlayerArray *players, const char *name);
 void readMapFromFile(Map *map, const char *filename);
 void *handleKeyboard(void *args);
 void readCommand(char* command, size_t commandSize);
-int handleCommand(char *input, KeyboardHandlerPacket *packet);
-void usersCommand(KeyboardHandlerPacket *packet);
+int handleCommand(char *input, KeyboardHandlerPacket *packet, WINDOW* window);
+void usersCommand(KeyboardHandlerPacket *packet, WINDOW* window);
 void beginCommand(KeyboardHandlerPacket *packet);
 void kickCommand(KeyboardHandlerPacket *packet, const char *name);
 void playerLobby(KeyboardHandlerPacket *keyboardPacket, PlayerArray *players, const int motorFd);
@@ -86,7 +86,7 @@ int main(int argc, char* argv[]) {
         if(!strcmp(command, "sair")) {
             exit(0);
         }
-        handleCommand(command, keyboardPacket);
+        handleCommand(command, &keyboardPacket, bottomWindow);
 
         //mvwprintw(bottomWindow, 3, 3, "%s", command);
     }
@@ -185,14 +185,14 @@ void readCommand(char *command, size_t commandSize) {
     command[strcspn(command, "\n")] = 0;
 }
 
-int handleCommand(char *input, KeyboardHandlerPacket *packet) {
+int handleCommand(char *input, KeyboardHandlerPacket *packet, WINDOW* window) {
 	char command[COMMAND_BUFFER_SIZE];
     char arg1[COMMAND_BUFFER_SIZE];
 
     int numArgs = sscanf(input, "%s %s", command, arg1);
 
     if (strcmp(command, "users") == 0 && numArgs == 1) {
-		usersCommand(packet);
+		usersCommand(packet, window);
     } else if(strcmp(command, "begin") == 0 && numArgs == 1) {
         beginCommand(packet);
     } else if(!strcmp(command, "kick") && numArgs == 2) {
@@ -201,11 +201,11 @@ int handleCommand(char *input, KeyboardHandlerPacket *packet) {
     return 1;
 }
 
-void usersCommand(KeyboardHandlerPacket *packet) {
+void usersCommand(KeyboardHandlerPacket *packet,WINDOW* window) {
     printf("User List:\n");
     for(int i = 0; i < packet->players->nPlayers; ++i) {
         printf("\t<%s>\n", packet->players->array[i].name);
-        //mvwprintw()
+        mvwprintw(window, 3,0, "\t<%s>\n", packet->players->array[i].name);
     }
 }
 
