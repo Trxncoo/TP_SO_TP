@@ -18,6 +18,7 @@ void setupCommand(WINDOW* bottomWindow);
 
 
 int main(int argc, char* argv[]) {  
+    printf("Sou o motor\n");
     int inscricao, nplayers, duracao, decremento; //Criar variaveis de ambiente
     PlayerArray players = {};
     Map map = {};
