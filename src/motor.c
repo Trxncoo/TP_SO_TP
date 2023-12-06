@@ -13,6 +13,7 @@ void kickCommand(KeyboardHandlerPacket *packet, const char *name);
 void playerLobby(KeyboardHandlerPacket *keyboardPacket, PlayerArray *players, const int motorFd);
 void getEnvs(int* inscricao, int* nplayers, int* duracao, int* decremento);
 void *handleJogoUI(void *args);
+void setupCommand(WINDOW* bottomWindow);
 
 int main(int argc, char* argv[]) {  
     int inscricao, nplayers, duracao, decremento; //Criar variaveis de ambiente
@@ -71,6 +72,24 @@ int main(int argc, char* argv[]) {
     refreshAll(topWindow, bottomWindow, sideWindow);
     readMapFromFile(&map, "map.txt");
     printMap(topWindow, &map);
+
+    while(2) { //be different 
+        char command[COMMAND_BUFFER_SIZE];  
+        mvwprintw(bottomWindow, 5, 1, "%s", "-->");
+        //setupCommand(bottomWindow);
+        echo();
+        curs_set(2);
+        wmove(bottomWindow, 2, 2);
+        wgetnstr(bottomWindow, command, sizeof(command)-1);
+        noecho();
+        curs_set(0);
+        if(!strcmp(command, "sair")) {
+            exit(0);
+        }
+        handleCommand(command, keyboardPacket);
+
+        //mvwprintw(bottomWindow, 3, 3, "%s", command);
+    }
     /*
     while(currentLevel < 4) {
         //sendMap
@@ -186,6 +205,7 @@ void usersCommand(KeyboardHandlerPacket *packet) {
     printf("User List:\n");
     for(int i = 0; i < packet->players->nPlayers; ++i) {
         printf("\t<%s>\n", packet->players->array[i].name);
+        //mvwprintw()
     }
 }
 
@@ -239,3 +259,9 @@ void getEnvs(int* inscricao, int* nplayers, int* duracao, int* decremento) {
     *decremento = atoi(getenv("DECREMENTO"));
 }
 
+
+void setupCommand(WINDOW* bottomWindow) {
+    echo();
+    curs_set(2);
+    wmove(bottomWindow, 2, 2);
+}
