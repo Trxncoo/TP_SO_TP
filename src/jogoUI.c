@@ -29,6 +29,8 @@ int main(int argc, char* argv[]) {
         PERROR("Creating thread");
         exit(EXIT_FAILURE);
     }
+
+
 /*
     initScreen();
 
@@ -83,14 +85,19 @@ void *handleEvents(void *args) {
 
             case SYNC:
                 *(eventPacket->players) = packet.data.syncPacket.players;
+                int myTempId=-1;
                 for(int i = 0; i < eventPacket->players->nPlayers; ++i) {
                     printf("%s\n", eventPacket->players->array[i].name);
+                    if(getpid()==eventPacket->players->array[i].pid) {
+                        printf("Sou o jogador %d\t%s\n",i+1, eventPacket->players->array[i].name);
+                    }
                 }
                 break;
 
             default:
                 break;
         }
+        
     }
 }
 

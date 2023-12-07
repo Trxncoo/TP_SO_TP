@@ -14,6 +14,8 @@ void playerLobby(KeyboardHandlerPacket *keyboardPacket, PlayerArray *players, co
 void getEnvs(int* inscricao, int* nplayers, int* duracao, int* decremento);
 void *handleJogoUI(void *args);
 void setupCommand(WINDOW* bottomWindow);
+void bmovCommand(KeyboardHandlerPacket)
+void rbmCommand(KeyboardHandlerPacket);
 
 
 
@@ -189,9 +191,19 @@ int handleCommand(char *input, KeyboardHandlerPacket *packet) {
         beginCommand(packet);
     } else if(!strcmp(command, "kick") && numArgs == 2) {
         kickCommand(packet, arg1);
+    } else if(!strcmp(command, "bmov") && numArgs == 1) {
+        bmovCommand(packet);
+    } else if(!strcmp(command, "rbm") && numArgs == 1) {
+        rbmCommand(packet);
     }
     return 1;
 }
+
+void bmovCommand(KeyboardHandlerPacket);
+
+void rbmCommand(KeyboardHandlerPacket);
+
+
 
 void usersCommand(KeyboardHandlerPacket *packet) {
     printf("User List:\n");

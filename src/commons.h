@@ -26,7 +26,8 @@ typedef enum {
     KICK,
     MESSAGE,
     EXIT,
-    SYNC
+    SYNC,
+    ENTITY
 } MessageType;
 
 
@@ -56,7 +57,12 @@ typedef struct {
     int keyboardFeed;
     int *motorFd;
     int *jogoUIFd;
+    int* MovableObstacle //nao sei se se faz realloc ou o crl
 } KeyboardHandlerPacket;
+
+typedef struct {
+    int x,y; //o char é B
+} MovableObstacle;
 
 typedef struct {
     PlayerArray players;
