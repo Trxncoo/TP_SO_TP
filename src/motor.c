@@ -10,24 +10,23 @@ int handleCommand(char *input, KeyboardHandlerPacket *packet);
 void usersCommand(KeyboardHandlerPacket *packet);
 void beginCommand(KeyboardHandlerPacket *packet);
 void kickCommand(KeyboardHandlerPacket *packet, const char *name);
-void playerLobby(KeyboardHandlerPacket *keyboardPacket, PlayerArray *players, const int motorFd);
+void playerLobby(KeyboardHandlerPacket *keyboardPacket, int inscricao, int nplayers);
+void getPlayer(PlayerArray *players, int motorFd);
 void getEnvs(int* inscricao, int* nplayers, int* duracao, int* decremento);
 void *handleJogoUI(void *args);
 void setupCommand(WINDOW* bottomWindow);
-void bmovCommand(KeyboardHandlerPacket)
-void rbmCommand(KeyboardHandlerPacket);
-
-
+void endCommand(KeyboardHandlerPacket *packet);
+void initBot(KeyboardHandlerPacket *packet, int interval, int duration);
+void *botHandle(void *args);
 
 int main(int argc, char* argv[]) {  
-    printf("Sou o motor\n");
     int inscricao, nplayers, duracao, decremento; //Criar variaveis de ambiente
     PlayerArray players = {};
     Map map = {};
     int motorFd;
-    KeyboardHandlerPacket keyboardPacket = {&players, &map, 1, &motorFd};
-    pthread_t keyBoardHandlerThread, eventHandler;
-    int currentLevel = 1, gameRun;
+    int currentLevel = 1, isGameRunning = 1;
+    KeyboardHandlerPacket keyboardPacket = {&players, &map, 1, &motorFd, NULL, &isGameRunning};
+    pthread_t keyBoardHandlerThread, eventHandler, botThread;
 
     initMotor(&motorFd, &inscricao, &nplayers, &duracao, &decremento);
     
@@ -35,14 +34,13 @@ int main(int argc, char* argv[]) {
         PERROR("Creating thread");
         exit(EXIT_FAILURE);
     }
+    playerLobby(&keyboardPacket, inscricao, nplayers);
     
-    playerLobby(&keyboardPacket, &players, motorFd);
 
-    if(pthread_create(&eventHandler, NULL, handleJogoUI, (void*)&keyboardPacket) !=0) {
+    if(pthread_create(&eventHandler, NULL, handleJogoUI, (void*)&keyboardPacket) != 0) {
         PERROR("Creating thread");
         exit(EXIT_FAILURE);
     }
-
     SynchronizePacket syncPacket = {players, map};
     Packet packet;
     packet.type = SYNC;
@@ -52,6 +50,15 @@ int main(int argc, char* argv[]) {
         writeToPipe(players.playerFd[i], &packet, sizeof(Packet));
     }
 
+    if(pthread_create(&botThread, NULL, botHandle, (void*)&keyboardPacket) !=0) {
+        PERROR("Creating thread");
+        exit(EXIT_FAILURE);
+    }
+    sleep(5);
+    isGameRunning = 0;
+    for(int i = 0; i < map.currentStones; ++i) {
+        printf("Pedra %d: %d %d %d\n", i, map.stones[i].x, map.stones[i].y, map.stones[i].duration);
+    }
     /*
     initScreen();
 
@@ -100,9 +107,14 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
+void *botHandle(void *args) {
+    KeyboardHandlerPacket *packet = (KeyboardHandlerPacket*)args;
+    initBot(packet, 2, 2);
+}
+
 void initMotor(int *motorFd, int *inscricao, int *nplayers, int *duracao, int *decremento) {
 
-    //getEnvs(&inscricao, &nplayers, &duracao, &decremento);
+    getEnvs(inscricao, nplayers, duracao, decremento);
 
     setupSigIntMotor();
 
@@ -145,7 +157,6 @@ void *handleKeyboard(void *args) {
     }
 }
 
-
 void *handleJogoUI(void *args) {
     KeyboardHandlerPacket *packet =(KeyboardHandlerPacket*)args;
     Packet typePacket;
@@ -185,25 +196,17 @@ int handleCommand(char *input, KeyboardHandlerPacket *packet) {
 
     int numArgs = sscanf(input, "%s %s", command, arg1);
 
-    if (strcmp(command, "users") == 0 && numArgs == 1) {
+    if (!strcmp(command, "users") && numArgs == 1) {
 		usersCommand(packet);
-    } else if(strcmp(command, "begin") == 0 && numArgs == 1) {
+    } else if(!strcmp(command, "begin") && numArgs == 1) {
         beginCommand(packet);
     } else if(!strcmp(command, "kick") && numArgs == 2) {
         kickCommand(packet, arg1);
-    } else if(!strcmp(command, "bmov") && numArgs == 1) {
-        bmovCommand(packet);
-    } else if(!strcmp(command, "rbm") && numArgs == 1) {
-        rbmCommand(packet);
+    } else if(!strcmp(command, "end") && numArgs == 1) {
+        endCommand(packet);
     }
     return 1;
 }
-
-void bmovCommand(KeyboardHandlerPacket);
-
-void rbmCommand(KeyboardHandlerPacket);
-
-
 
 void usersCommand(KeyboardHandlerPacket *packet) {
     printf("User List:\n");
@@ -234,21 +237,99 @@ void kickCommand(KeyboardHandlerPacket *packet, const char *name) {
     }
 }
 
-void playerLobby(KeyboardHandlerPacket *keyboardPacket, PlayerArray *players, const int motorFd) {
+void endCommand(KeyboardHandlerPacket *packet) {
+    for(int i = 0; i < packet->players->nPlayers; ++i) {
+        Packet packetSender;
+        packetSender.type = END;
+        strcpy(packetSender.data.content, "O jogo foi terminado");
+        int fd = openPipeForWriting(packet->players->array[i].pipe);
+        writeToPipe(fd, &packetSender, sizeof(Packet));
+        close(fd);
+    }
+    close(*packet->motorFd);
+    unlink(JOGOUI_TO_MOTOR_PIPE);
+    exit(0);
+}
+
+void playerLobby(KeyboardHandlerPacket *keyboardPacket, int inscricao, int nplayers) {
+    PlayerArray *players = keyboardPacket->players;
+    int motorFd = *keyboardPacket->motorFd;
+    
+    fd_set readFds;
+    FD_ZERO(&readFds);
+    FD_SET(motorFd, &readFds);
+
+    time_t startTime, currentTime;
+    time(&startTime);
+
     while(keyboardPacket->keyboardFeed && players->nPlayers < MAX_PLAYERS) {
+        time(&currentTime);
+        double timeElapsed = difftime(currentTime, startTime);
+        double timeRemaining = inscricao - timeElapsed;
+        
+        struct timeval timeout;
+        if(timeRemaining < 0) {
+            timeRemaining = 0;
+        }
+        timeout.tv_sec = (int)timeRemaining;
+        timeout.tv_usec = 0;
+        printf("%d\n", timeout.tv_sec);
+        int ready = select(motorFd + 1, &readFds, NULL, NULL, &timeout);
+
+        switch(ready) {
+            case -1:
+                PERROR("Select");
+                exit(0);
+
+            case 0:
+                if(players->nPlayers >= nplayers) {
+                    return;
+                } else {
+                    while(players->nPlayers < nplayers) {
+                        getPlayer(players, motorFd);
+                    }
+                    return;
+                }
+
+            default:
+                if(FD_ISSET(motorFd, &readFds)) {
+                    getPlayer(players, motorFd);
+                }
+                break;
+        }
+    }
+
+
+    /*while(keyboardPacket->keyboardFeed && keyboardPacket->players->nPlayers < MAX_PLAYERS) {
         int confirmationFlag = 0;
-        readFromPipe(motorFd, &players->array[players->nPlayers], sizeof(Player));
-        int currentjogoUIFd = openPipeForWriting(players->array[players->nPlayers].pipe);
-        if(isNameAvailable(players, players->array[players->nPlayers].name)) {
-            players->array[players->nPlayers].isPlaying = 1;
+        readFromPipe(*keyboardPacket->motorFd, &keyboardPacket->players->array[keyboardPacket->players->nPlayers], sizeof(Player));
+        int currentjogoUIFd = openPipeForWriting(keyboardPacket->players->array[keyboardPacket->players->nPlayers].pipe);
+        if(isNameAvailable(keyboardPacket->players, keyboardPacket->players->array[keyboardPacket->players->nPlayers].name)) {
+            keyboardPacket->players->array[keyboardPacket->players->nPlayers].isPlaying = 1;
             confirmationFlag = 1;
             writeToPipe(currentjogoUIFd, &confirmationFlag, sizeof(int));
         } else {
             writeToPipe(currentjogoUIFd, &confirmationFlag, sizeof(int));
         }
-        players->nPlayers++;  
+        keyboardPacket->players->nPlayers++;  
         close(currentjogoUIFd);      
+    }*/
+}
+
+void getPlayer(PlayerArray *players, int motorFd) {
+    int confirmationFlag = 0;
+    readFromPipe(motorFd, &players->array[players->nPlayers], sizeof(Player));
+    int currentjogoUIFd = openPipeForWriting(players->array[players->nPlayers].pipe);
+    if (isNameAvailable(players, players->array[players->nPlayers].name)) {
+        players->array[players->nPlayers].isPlaying = 1;
+        confirmationFlag = 1;
+        writeToPipe(currentjogoUIFd, &confirmationFlag, sizeof(int));
+    } else {
+        writeToPipe(currentjogoUIFd, &confirmationFlag, sizeof(int));
     }
+
+    players->nPlayers++;
+    close(currentjogoUIFd);
 }
 
 void getEnvs(int* inscricao, int* nplayers, int* duracao, int* decremento) {
@@ -267,4 +348,58 @@ void setupCommand(WINDOW* bottomWindow) {
     echo();
     curs_set(2);
     wmove(bottomWindow, 2, 2);
+}
+
+void initBot(KeyboardHandlerPacket *packet, int interval, int duration) {
+	char intervalBuffer[3];
+	sprintf(intervalBuffer, "%d", interval);
+	char durationBuffer[3];
+	sprintf(durationBuffer, "%d", duration);
+    char frase[20];
+    
+    int pipe_fd[2];
+    if(pipe(pipe_fd) == -1){
+    	return;
+    }
+    pid_t pid2 = fork();
+    int child = pid2 == 0;
+    if(child) {
+    	close(pipe_fd[0]); 
+
+        dup2(pipe_fd[1], STDOUT_FILENO);
+
+        close(pipe_fd[1]);
+
+        execlp("./bot", "./bot", intervalBuffer, durationBuffer, NULL);
+
+        perror("execl");
+        exit(EXIT_FAILURE);
+
+    } else {
+    	close(pipe_fd[1]);
+
+        char buffer[256];
+        ssize_t bytesRead;
+
+        while (*packet->isGameRunning) {
+            bytesRead = read(pipe_fd[0], buffer, sizeof(buffer) - 1);
+
+            if (bytesRead > 0 && *packet->isGameRunning) {
+                buffer[bytesRead] = '\0'; 
+                printf("Is game running: %d", *packet->isGameRunning);
+                printf("Received: %s", buffer);
+                sscanf(buffer, "%d %d %d", &packet->map->stones[packet->map->currentStones].x, 
+                                           &packet->map->stones[packet->map->currentStones].y, 
+                                           &packet->map->stones[packet->map->currentStones].duration);
+                packet->map->currentStones++;
+                fflush(stdout);
+            }
+        }
+
+        close(pipe_fd[0]); 
+
+        waitpid(pid2, NULL, 0);
+        printf("A sair\n");
+        fflush(stdout);
+    }
 }

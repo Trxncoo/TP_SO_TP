@@ -5,7 +5,10 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <fcntl.h>
+#include <sys/select.h>
+#include <time.h>
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
@@ -19,6 +22,7 @@
 #define MAX_WIDTH 81
 #define PLAYER_NAME_SIZE 20
 #define MAX_PLAYERS 5
+#define MAX_STONES 50
 #define COMMAND_BUFFER_SIZE 80
 #define MAX_PIPE_SIZE 12
 
@@ -27,7 +31,7 @@ typedef enum {
     MESSAGE,
     EXIT,
     SYNC,
-    ENTITY
+    END
 } MessageType;
 
 
@@ -48,6 +52,14 @@ typedef struct {
 } PlayerArray;
 
 typedef struct {
+    int x;
+    int y;
+    int duration;
+} Stone;
+
+typedef struct {
+    Stone stones[MAX_STONES];
+    int currentStones;
     char array[MAX_HEIGHT][MAX_WIDTH];
 } Map;
 
@@ -57,12 +69,8 @@ typedef struct {
     int keyboardFeed;
     int *motorFd;
     int *jogoUIFd;
-    int* MovableObstacle //nao sei se se faz realloc ou o crl
+    int *isGameRunning;
 } KeyboardHandlerPacket;
-
-typedef struct {
-    int x,y; //o char é B
-} MovableObstacle;
 
 typedef struct {
     PlayerArray players;

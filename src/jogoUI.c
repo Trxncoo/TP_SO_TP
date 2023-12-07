@@ -93,6 +93,14 @@ void *handleEvents(void *args) {
                     }
                 }
                 break;
+            
+            case END:
+                printf("%s\n", packet.data.content);
+                sleep(2);
+                close(*eventPacket->motorFd);
+                close(*eventPacket->jogoUIFd);
+                unlink(eventPacket->players->array[myId].pipe);
+                exit(0);
 
             default:
                 break;
