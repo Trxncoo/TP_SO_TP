@@ -9,6 +9,7 @@ void readCommand(char* command, size_t commandSize);
 int handleCommand(char *input, KeyboardHandlerPacket *packet);
 void usersCommand(KeyboardHandlerPacket *packet);
 void beginCommand(KeyboardHandlerPacket *packet);
+void syncPlayers(PlayerArray *players);
 void kickCommand(KeyboardHandlerPacket *packet, const char *name);
 void playerLobby(KeyboardHandlerPacket *keyboardPacket, int inscricao, int nplayers);
 void getPlayer(PlayerArray *players, int motorFd);
@@ -158,29 +159,36 @@ void *handleKeyboard(void *args) {
 
 void *handleJogoUI(void *args) {
     KeyboardHandlerPacket *packet =(KeyboardHandlerPacket*)args;
+    PlayerArray *players = packet->players;
+    int motorFd = *packet->motorFd;
+
     Packet typePacket;
     while(1) {
-        readFromPipe(*packet->motorFd, &typePacket, sizeof(Packet));
+        readFromPipe(motorFd, &typePacket, sizeof(Packet));
         switch(typePacket.type) {
             case EXIT:
                 printf("A expulsar %s\n", typePacket.data.content);
-                for(int i = 0; i < packet->players->nPlayers; ++i) {
-                    if(!strcmp(typePacket.data.content, packet->players->array[i].name)) {
-                        packet->players->array[i] = packet->players->array[packet->players->nPlayers - 1];
-                        packet->players->playerFd[i] = packet->players->playerFd[packet->players->nPlayers - 1];
-                        packet->players->nPlayers--;
+                for(int i = 0; i < players->nPlayers; ++i) {
+                    if(!strcmp(typePacket.data.content, players->array[i].name)) {
+                        players->array[i] = players->array[players->nPlayers - 1];
+                        players->playerFd[i] = players->playerFd[players->nPlayers - 1];
+                        players->nPlayers--;
                     }
                 }
                 break;
         }
 
-        for(int i = 0; i < packet->players->nPlayers; ++i) {
-            Packet packetSender;
-            packetSender.type = SYNC;
-            packetSender.data.syncPacket.players = *packet->players;
-            printf("%d\n", packetSender.data.syncPacket.players.nPlayers);
-            writeToPipe(packet->players->playerFd[i], &packetSender, sizeof(Packet));
-        }
+        syncPlayers(players);
+    }
+}
+
+void syncPlayers(PlayerArray *players) {
+    for(int i = 0; i < players->nPlayers; ++i) {
+        Packet packetSender;
+        packetSender.type = SYNC;
+        packetSender.data.syncPacket.players = *players;
+        printf("%d\n", packetSender.data.syncPacket.players.nPlayers);
+        writeToPipe(players->playerFd[i], &packetSender, sizeof(Packet));
     }
 }
 
@@ -230,7 +238,9 @@ void kickCommand(KeyboardHandlerPacket *packet, const char *name) {
             writeToPipe(fd, &packetSender, sizeof(Packet));
             close(fd);
             packet->players->array[i] = packet->players->array[packet->players->nPlayers - 1];
+            packet->players->playerFd[i] = packet->players->playerFd[packet->players->nPlayers - 1];
             packet->players->nPlayers--;
+            syncPlayers(packet->players);
             return;
         }
     }
@@ -297,22 +307,6 @@ void playerLobby(KeyboardHandlerPacket *keyboardPacket, int inscricao, int nplay
                 break;
         }
     }
-
-
-    /*while(keyboardPacket->keyboardFeed && keyboardPacket->players->nPlayers < MAX_PLAYERS) {
-        int confirmationFlag = 0;
-        readFromPipe(*keyboardPacket->motorFd, &keyboardPacket->players->array[keyboardPacket->players->nPlayers], sizeof(Player));
-        int currentjogoUIFd = openPipeForWriting(keyboardPacket->players->array[keyboardPacket->players->nPlayers].pipe);
-        if(isNameAvailable(keyboardPacket->players, keyboardPacket->players->array[keyboardPacket->players->nPlayers].name)) {
-            keyboardPacket->players->array[keyboardPacket->players->nPlayers].isPlaying = 1;
-            confirmationFlag = 1;
-            writeToPipe(currentjogoUIFd, &confirmationFlag, sizeof(int));
-        } else {
-            writeToPipe(currentjogoUIFd, &confirmationFlag, sizeof(int));
-        }
-        keyboardPacket->players->nPlayers++;  
-        close(currentjogoUIFd);      
-    }*/
 }
 
 void getPlayer(PlayerArray *players, int motorFd) {
