@@ -26,6 +26,7 @@ int addBot(KeyboardHandlerPacket *packet, int interval, int duration);
 void initBmov(KeyboardHandlerPacket *packet, Bmov *bmov);
 void bmovCommand(KeyboardHandlerPacket *packet);
 void rbmCommand(KeyboardHandlerPacket *packet);
+int listBmovs(KeyboardHandlerPacket *packet);
 
 int main(int argc, char* argv[]) {  
     int inscricao, nplayers, duracao, decremento; //Criar variaveis de ambiente
@@ -83,6 +84,8 @@ int main(int argc, char* argv[]) {
         PERROR("Creating thread");
         exit(EXIT_FAILURE);
     }
+
+
 
     sleep(5);
     isGameRunning = 0;
@@ -213,6 +216,8 @@ int isNameAvailable(const PlayerArray *players, const char *name) {
     return 1;
 }
 
+
+
 void readMapFromFile(Map *map, const char *filename) {
     int fd = open(filename, O_RDONLY);
     if (fd == -1) {
@@ -237,6 +242,17 @@ void *handleKeyboard(void *args) {
         handleCommand(commandBuffer, packet);
     }
 }
+
+int listBmovs(KeyboardHandlerPacket *packet) {
+    for(int j=0;j<3;j++) {
+        sleep(1);
+        for(int i=0;i<packet->bmovs->nbmovs; i++) {
+            printf("Bot %d:%d:%d\n", i+1, packet->bmovs->bmovs[i].x, packet->bmovs->bmovs[i].y);        
+        }
+    }
+}
+
+
 
 void *handleJogoUI(void *args) {
     KeyboardHandlerPacket *packet =(KeyboardHandlerPacket*)args;
@@ -278,6 +294,7 @@ void readCommand(char *command, size_t commandSize) {
     command[strcspn(command, "\n")] = 0;
 }
 
+
 int handleCommand(char *input, KeyboardHandlerPacket *packet) {
 	char command[COMMAND_BUFFER_SIZE];
     char arg1[COMMAND_BUFFER_SIZE];
@@ -298,8 +315,62 @@ int handleCommand(char *input, KeyboardHandlerPacket *packet) {
         bmovCommand(packet);
     } else if(!strcmp(command, "rbm") && numArgs == 1) {
         rbmCommand(packet);
+    } else if(!strcmp(command, "listBmovs") && numArgs == 1) {
+        int listId;
+        listBmovs(packet);
     }
     return 1;
+}
+
+void handleBmovs(KeyboardHandlerPacket* packet) {
+    while(packet->bmovs->nbmovs>0) {
+        sleep(1);
+        for(int i=0;i<packet->bmovs->nbmovs;i++) {
+            do {
+                int tempIsAvailable=1;
+                int side = rand() % 4 +1; //1 left 2 right 3 up 4 down
+                //check available for players
+                int tempX, tempY;
+                tempX = packet->bmovs->bmovs[i]->x;
+                tempY = packet->bmovs->bmovs[i]->y;
+                switch(side) {
+                    case 1:
+                        tempX+=2;
+                        break;
+                    case 2:
+                        tempX-=2;
+                        break;
+                    case 3:
+                        tempY++;
+                        break;
+                    case 4:
+                        tempY--;
+                        break;
+                    default:
+                        printf("rand invalido");
+                        exit(0);
+                        break;
+                }
+                for(int j = 0; j<packet->players->nPlayers;j++) {
+                    if(tempX == packet->players->array[i].xCoordinate
+                    && tempY == packet->players->array[i].yCoordinate) {
+                        tempIsAvailable=0;
+                        break;
+                    }
+                }
+                if(tempIsAvailable) {
+                    if(tempX < 1
+                    || tempY < 1
+                    || tempX > MAX_WIDTH
+                    || tempY > MAX_HEIGHT) {
+                        tempIsAvailable =0;
+                    }
+                }
+                //TODO nao sei se o mapa ta width2x ou n so falta ver isso
+
+            }while(!tempIsAvailable);
+        }
+    }
 }
 
 void usersCommand(KeyboardHandlerPacket *packet) {
