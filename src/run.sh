@@ -1,4 +1,4 @@
-export INSCRICAO=20
+export INSCRICAO=10
 export NPLAYERS=3
 export DURACAO=300
 export DECREMENTO=10
