@@ -23,6 +23,8 @@
 #define PLAYER_NAME_SIZE 20
 #define MAX_PLAYERS 5
 #define MAX_STONES 50
+#define MAX_BMOVS 5
+#define MAX_BOTS 10
 #define COMMAND_BUFFER_SIZE 80
 #define MAX_PIPE_SIZE 12
 
@@ -33,7 +35,6 @@ typedef enum {
     SYNC,
     END
 } MessageType;
-
 
 typedef struct {
     char name[PLAYER_NAME_SIZE];
@@ -52,6 +53,26 @@ typedef struct {
 } PlayerArray;
 
 typedef struct {
+    int interval;
+    int duration;
+} Bot;
+
+typedef struct {
+    Bot bots[MAX_BOTS];
+    int nBots;
+} BotArray;
+
+typedef struct {
+    int x;
+    int y;
+} Bmov;
+
+typedef struct {
+    Bmov bmovs[MAX_BMOVS];
+    int nbmovs;
+} BmovArray;
+
+typedef struct {
     int x;
     int y;
     int duration;
@@ -66,10 +87,13 @@ typedef struct {
 typedef struct {
     PlayerArray *players;
     Map *map;
+    BotArray *bots;
+    BmovArray *bmovs;
     int keyboardFeed;
     int *motorFd;
     int *jogoUIFd;
     int *isGameRunning;
+    int *currentLevel;
 } KeyboardHandlerPacket;
 
 typedef struct {

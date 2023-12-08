@@ -18,7 +18,8 @@ int main(int argc, char* argv[]) {
     PlayerArray players = {};
     Map map = {};
     int jogoUIFd, motorFd;
-    KeyboardHandlerPacket keyboardPacket = {&players, &map, 1, &motorFd, &jogoUIFd};
+    int isGameRunning = 1, currentLevel = 1;
+    KeyboardHandlerPacket keyboardPacket = {&players, &map, NULL, NULL, 1, &motorFd, &jogoUIFd, &isGameRunning, &currentLevel};
     pthread_t eventHandler;
 
     initJogoUI(&player, argc, argv);

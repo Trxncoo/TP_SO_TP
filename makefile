@@ -1,10 +1,12 @@
+FLAGS = -pedantic -Wall -Wextra -pthread -lncurses
+
 all: motor jogoUI bot
 
 motor: motor.o communication.o cursesHelpers.o
-	gcc motor.o communication.o cursesHelpers.o -pthread -lncurses -o motor
+	gcc motor.o communication.o cursesHelpers.o $(FLAGS) -o motor
 
 jogoUI: jogoUI.o communication.o cursesHelpers.o
-	gcc jogoUI.o communication.o cursesHelpers.o -pthread -lncurses -o jogoUI
+	gcc jogoUI.o communication.o cursesHelpers.o $(FLAGS) -o jogoUI
 
 bot: bot.o
 	gcc bot.o -o bot

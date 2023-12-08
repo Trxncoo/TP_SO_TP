@@ -19,15 +19,26 @@ void setupCommand(WINDOW* bottomWindow);
 void endCommand(KeyboardHandlerPacket *packet);
 void initBot(KeyboardHandlerPacket *packet, int interval, int duration);
 void *botHandle(void *args);
+int generateRandom(int min, int max);
+void initPlayerLocations(KeyboardHandlerPacket *packet);
+void botsCommand(KeyboardHandlerPacket *packet);
+int addBot(KeyboardHandlerPacket *packet, int interval, int duration);
+void initBmov(KeyboardHandlerPacket *packet, Bmov *bmov);
+void bmovCommand(KeyboardHandlerPacket *packet);
+void rbmCommand(KeyboardHandlerPacket *packet);
 
 int main(int argc, char* argv[]) {  
     int inscricao, nplayers, duracao, decremento; //Criar variaveis de ambiente
     PlayerArray players = {};
     Map map = {};
+    BotArray bots = {};
+    BmovArray bmovs = {};
     int motorFd;
     int currentLevel = 1, isGameRunning = 1;
-    KeyboardHandlerPacket keyboardPacket = {&players, &map, 1, &motorFd, NULL, &isGameRunning};
+    KeyboardHandlerPacket keyboardPacket = {&players, &map, &bots, &bmovs, 1, &motorFd, NULL, &isGameRunning, &currentLevel};
     pthread_t keyBoardHandlerThread, eventHandler, botThread;
+
+    srand(time(NULL)); // Seed the random number generator with current time
 
     initMotor(&motorFd, &inscricao, &nplayers, &duracao, &decremento);
     
@@ -41,6 +52,7 @@ int main(int argc, char* argv[]) {
         PERROR("Creating thread");
         exit(EXIT_FAILURE);
     }
+
     SynchronizePacket syncPacket = {players, map};
     Packet packet;
     packet.type = SYNC;
@@ -50,15 +62,31 @@ int main(int argc, char* argv[]) {
         writeToPipe(players.playerFd[i], &packet, sizeof(Packet));
     }
 
+
+    readMapFromFile(&map, "map.txt");
+    initPlayerLocations(&keyboardPacket);
+    
+    for(int i = 0; i < players.nPlayers; ++i) {
+        int x = players.array[i].xCoordinate;
+        int y = players.array[i].yCoordinate;
+        char icone = players.array[i].icone;
+        map.array[y][x] = icone;
+    }
+
+    for(int i = 0; i < MAX_HEIGHT; ++i) {
+        for(int j = 0; j < MAX_WIDTH; ++j) {
+            printf("%c", map.array[i][j]);
+        }
+    }
+
     if(pthread_create(&botThread, NULL, botHandle, (void*)&keyboardPacket) !=0) {
         PERROR("Creating thread");
         exit(EXIT_FAILURE);
     }
+
     sleep(5);
     isGameRunning = 0;
-    for(int i = 0; i < map.currentStones; ++i) {
-        printf("Pedra %d: %d %d %d\n", i, map.stones[i].x, map.stones[i].y, map.stones[i].duration);
-    }
+
     /*
     initScreen();
 
@@ -109,7 +137,60 @@ int main(int argc, char* argv[]) {
 
 void *botHandle(void *args) {
     KeyboardHandlerPacket *packet = (KeyboardHandlerPacket*)args;
-    initBot(packet, 2, 2);
+    BotArray *bots = packet->bots;
+    int currentLevel = *packet->currentLevel;
+
+    switch(currentLevel) {
+        case 1:
+            if(addBot(packet, 30, 10)) {
+                printf("Bot adicionado com sucesso\n");
+            }
+            if(addBot(packet, 25, 5)) {
+                printf("Bot adicionado com sucesso\n");
+            }
+            break;
+
+        case 2:
+            if(addBot(packet, 30, 15)) {
+                printf("Bot adicionado com sucesso\n");
+            }
+            if(addBot(packet, 25, 10)) {
+                printf("Bot adicionado com sucesso\n");
+            }
+            if(addBot(packet, 20, 5)) {
+                printf("Bot adicionado com sucesso\n");
+            }
+            break;
+
+        case 3:
+            if(addBot(packet, 30, 20)) {
+                printf("Bot adicionado com sucesso\n");
+            }
+            if(addBot(packet, 25, 15)) {
+                printf("Bot adicionado com sucesso\n");
+            }
+            if(addBot(packet, 20, 10)) {
+                printf("Bot adicionado com sucesso\n");
+            }
+            if(addBot(packet, 15, 5)) {
+                printf("Bot adicionado com sucesso\n");
+            }
+            break;
+    }
+}
+
+int addBot(KeyboardHandlerPacket *packet, int interval, int duration) {
+    BotArray *bots = packet->bots;
+    if(bots->nBots < MAX_BOTS) {
+        bots->bots[bots->nBots].interval = interval;
+        bots->bots[bots->nBots].duration = duration;
+        bots->nBots++;
+        //TODO: TEMOS DE METER ISTO NUMA THREAD
+        //initBot(packet, interval, duration);
+        return 1;
+    }
+
+    return 0;
 }
 
 void initMotor(int *motorFd, int *inscricao, int *nplayers, int *duracao, int *decremento) {
@@ -211,6 +292,12 @@ int handleCommand(char *input, KeyboardHandlerPacket *packet) {
         kickCommand(packet, arg1);
     } else if(!strcmp(command, "end") && numArgs == 1) {
         endCommand(packet);
+    } else if(!strcmp(command, "bots") && numArgs == 1) {
+        botsCommand(packet);
+    } else if(!strcmp(command, "bmov") && numArgs == 1) {
+        bmovCommand(packet);
+    } else if(!strcmp(command, "rbm") && numArgs == 1) {
+        rbmCommand(packet);
     }
     return 1;
 }
@@ -395,4 +482,76 @@ void initBot(KeyboardHandlerPacket *packet, int interval, int duration) {
         printf("A sair\n");
         fflush(stdout);
     }
+}
+
+int generateRandom(int min, int max) {
+    return rand() % (max - min + 1) + min;
+}
+
+void initPlayerLocations(KeyboardHandlerPacket *packet) {
+    PlayerArray *players = packet->players;
+    Map *map = packet->map;
+
+    int startingRow = MAX_HEIGHT - 1;
+
+    for(int i = 0; i < players->nPlayers; ++i) {
+        int randomX = 0;
+        int icone = players->array[i].icone;
+        players->array[i].yCoordinate = startingRow;
+        do {
+            randomX = generateRandom(0, MAX_WIDTH - 2);
+        } while(map->array[startingRow][randomX] != ' ');
+        players->array[i].xCoordinate = randomX;
+        map->array[startingRow][randomX] = icone;
+    }
+}
+
+void botsCommand(KeyboardHandlerPacket *packet) {
+    BotArray *bots = packet->bots;
+
+    for(int i = 0; i < bots->nBots; ++i) {
+        printf("Bot Interval: %d | Bot Duration: %d\n", bots->bots[i].interval, bots->bots[i].duration);
+    }
+}
+
+void bmovCommand(KeyboardHandlerPacket *packet) {
+    BmovArray *bmovs = packet->bmovs;
+    if(bmovs->nbmovs < MAX_BMOVS) {
+        initBmov(packet, &bmovs->bmovs[bmovs->nbmovs]);
+        bmovs->nbmovs++;
+        printf("Bmov added successfuly\n");
+    } else {
+        printf("Max Num of Bmovs\n");
+        return;
+    }
+}
+
+void initBmov(KeyboardHandlerPacket *packet, Bmov *bmov) {
+    Map *map = packet->map;
+    int x;
+    int y;
+    
+    do {
+        x = generateRandom(0, MAX_WIDTH - 2);
+        y = generateRandom(0, MAX_WIDTH - 2);
+    } while(map->array[x][y] != ' ');
+    
+    bmov->x = x;
+    bmov->y = y;
+}
+
+void rbmCommand(KeyboardHandlerPacket *packet) {
+    BmovArray *bmovs = packet->bmovs;
+
+    if(bmovs->nbmovs <= 0) {
+        printf("No bmovs to remove\n");
+        return;
+    }
+
+    for(int i = 0; i < bmovs->nbmovs - 1; ++i) {
+        bmovs->bmovs[i] = bmovs->bmovs[i + 1];
+    }
+
+    bmovs->nbmovs--;
+    printf("Bmov removed\n");
 }
