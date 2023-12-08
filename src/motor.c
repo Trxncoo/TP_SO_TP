@@ -34,15 +34,8 @@ int main(int argc, char* argv[]) {
         PERROR("Creating thread");
         exit(EXIT_FAILURE);
     }
-<<<<<<< HEAD
     playerLobby(&keyboardPacket, inscricao, nplayers);
-    
 
-=======
-
-    playerLobby(&keyboardPacket, inscricao, nplayers);
-    
->>>>>>> e6af43b (lmao)
     if(pthread_create(&eventHandler, NULL, handleJogoUI, (void*)&keyboardPacket) != 0) {
         PERROR("Creating thread");
         exit(EXIT_FAILURE);

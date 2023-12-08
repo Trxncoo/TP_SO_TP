@@ -25,4 +25,4 @@ cursesHelpers.o: ./src/cursesHelpers.c ./src/cursesHelpers.h ./src/commons.h
 	gcc -c ./src/cursesHelpers.c
 
 clean:
-	rm *.o motor jogoUI
+	rm *.o motor jogoUI bot
