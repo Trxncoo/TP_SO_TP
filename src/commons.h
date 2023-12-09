@@ -111,7 +111,11 @@ typedef struct {
     union Data data;
 } Packet;
 
-
+typedef struct {
+    KeyboardHandlerPacket *packet;
+    int interval;
+    int duration;
+} BotPacket;
 
 
 #endif
