@@ -15,11 +15,11 @@ void rbmCommand(KeyboardHandlerPacket *packet);
 // Thread Handlers
 void *handleKeyboard(void *args); // KeyboardHandlerThread
 void *handleEvent(void *args);    // EventHandlerThread
-void handleBot(KeyboardHandlerPacket *packet);
+void *handleBot(void *args);      // BotHandlerThread
 
 // Initizalizers
 void initMotor(int *motorFd, int *inscricao, int *nplayers, int *duracao, int *decremento);
-void *initBot(void *args);
+void initBot(KeyboardHandlerPacket *packet);
 void initBmov(KeyboardHandlerPacket *packet, Bmov *bmov);
 void initPlayerLocations(KeyboardHandlerPacket *packet);
 
@@ -35,6 +35,7 @@ int generateRandom(int min, int max);
 void addBot(KeyboardHandlerPacket *packet, int interval, int duration);
 int listBmovs(KeyboardHandlerPacket *packet);
 void jogoUIExit(PlayerArray *players, const char *name);
+void runBots(KeyboardHandlerPacket *packet, int numBots, int botParams[][2]);
 
 int main(int argc, char* argv[]) {  
     int inscricao = 0, nplayers = 0, duracao = 0, decremento = 0; 
@@ -44,7 +45,7 @@ int main(int argc, char* argv[]) {
     BotArray bots = {}; 
     BmovArray bmovs = {}; 
     KeyboardHandlerPacket keyboardPacket = {&players, &map, &bots, &bmovs, 1, &motorFd, NULL, &isGameRunning, &currentLevel};
-    pthread_t keyBoardHandlerThread, eventHandlerThread;
+    pthread_t keyBoardHandlerThread, eventHandlerThread, botHandlerThread;
 
     initMotor(&motorFd, &inscricao, &nplayers, &duracao, &decremento);
     
@@ -85,10 +86,21 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    handleBot(&keyboardPacket);
-    sleep(5);
+    if(pthread_create(&botHandlerThread, NULL, handleBot, (void*)&keyboardPacket) != 0) {
+        PERROR("Creating thread");
+        exit(EXIT_FAILURE);
+    }    
+    sleep(10);
     isGameRunning = 0;
-
+    printf("Os bots devem ter acabado\n");
+    for(int i = 0; i < map.currentStones; ++i) {
+        map.array[map.stones[i].y][map.stones[i].x] = 'P';
+    }
+    for(int i = 0; i < MAX_HEIGHT; ++i) {
+        for(int j = 0; j < MAX_WIDTH; ++j) {
+            printf("%c", map.array[i][j]);
+        }
+    }
     /*
     initScreen();
 
@@ -127,6 +139,7 @@ int main(int argc, char* argv[]) {
 
     */
     
+
     
     if (pthread_join(keyBoardHandlerThread, NULL) != 0) {
         PERROR("Join thread");
@@ -137,21 +150,22 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
-void handleBot(KeyboardHandlerPacket *packet) {
+void *handleBot(void *args) {
+    KeyboardHandlerPacket *packet = (KeyboardHandlerPacket*)args;
     BotArray *bots = packet->bots;
     int currentLevel = *packet->currentLevel;
-    pthread_t botsThread[MAX_BOTS] = {};
+    pthread_t botsThread;
     
     switch(currentLevel) {
         case 1:
-            addBot(packet, 2 ,2);
-            addBot(packet, 5, 3);
+            addBot(packet, 30, 10);
+            addBot(packet, 25, 5);
             break;
 
         case 2:
-            addBot(packet, 0 ,0);
-            addBot(packet, 0, 0);
-            addBot(packet, 0, 0);
+            addBot(packet, 30, 15);
+            addBot(packet, 25, 10);
+            addBot(packet, 20, 5);
             break;
 
         case 3:
@@ -161,16 +175,7 @@ void handleBot(KeyboardHandlerPacket *packet) {
             addBot(packet, 15, 5);
             break;
     }
-
-    for(int i = 0; i < bots->nBots; ++i) {
-        BotPacket botPacket = {packet, bots->bots[i].interval, bots->bots[i].duration};
-        printf("Bot: %d | %d %d", i, bots->bots[i].interval, bots->bots[i].duration);
-        pthread_create(&botsThread[i], NULL, initBot, (void*)&botPacket);
-    }
-    
-    for(int i = 0; i < bots->nBots; ++i) {
-        pthread_join(botsThread[i], NULL);
-    }
+    initBot(packet);
 }
 
 void addBot(KeyboardHandlerPacket *packet, int interval, int duration) {
@@ -492,61 +497,56 @@ void setupCommand(WINDOW* bottomWindow) {
     wmove(bottomWindow, 2, 2);
 }
 
-void *initBot(void *args) {
-    BotPacket *botPacket = (BotPacket*)args;
-    KeyboardHandlerPacket *packet = botPacket->packet;
-	char intervalBuffer[3];
-	sprintf(intervalBuffer, "%d", botPacket->interval);
-	char durationBuffer[3];
-	sprintf(durationBuffer, "%d", botPacket->duration);
-    char frase[20];
-    
+void initBot(KeyboardHandlerPacket *packet) {    
+    BotArray *bots = packet->bots;
     int pipe_fd[2];
     if(pipe(pipe_fd) == -1){
     	PERROR("PIPE BOT");
         exit(0);
     }
-    pid_t pid2 = fork();
-    int child = pid2 == 0;
-    if(child) {
-    	close(pipe_fd[0]); 
+    for(int i = 0; i < bots->nBots; ++i) {
+        pid_t pid2 = fork();
+        if(!pid2) {
+            char intervalBuffer[3];
+            sprintf(intervalBuffer, "%d", bots->bots[i].interval);
+            char durationBuffer[3];
+            sprintf(durationBuffer, "%d", bots->bots[i].duration);
+            char frase[20];
+            close(pipe_fd[0]); 
 
-        dup2(pipe_fd[1], STDOUT_FILENO);
+            dup2(pipe_fd[1], STDOUT_FILENO);
 
-        close(pipe_fd[1]);
+            close(pipe_fd[1]);
 
-        execlp("./bot", "./bot", intervalBuffer, durationBuffer, NULL);
+            execlp("./bot", "./bot", intervalBuffer, durationBuffer, NULL);
 
-        perror("execl");
-        exit(EXIT_FAILURE);
+            perror("execl");
+            exit(EXIT_FAILURE);
+        }
+    }
+    
+    close(pipe_fd[1]);
 
-    } else {
-    	close(pipe_fd[1]);
-
-        char buffer[256];
-        ssize_t bytesRead;
-
-        while (*packet->isGameRunning) {
-            bytesRead = read(pipe_fd[0], buffer, sizeof(buffer) - 1);
-
-            if (bytesRead > 0 && *packet->isGameRunning) {
-                buffer[bytesRead] = '\0'; 
-                printf("Is game running: %d", *packet->isGameRunning);
-                printf("Received: %s", buffer);
-                sscanf(buffer, "%d %d %d", &packet->map->stones[packet->map->currentStones].x, 
-                                           &packet->map->stones[packet->map->currentStones].y, 
-                                           &packet->map->stones[packet->map->currentStones].duration);
-                packet->map->currentStones++;
-                fflush(stdout);
+    char buffer[256];
+    ssize_t bytesRead;  
+    while (*packet->isGameRunning) {
+        bytesRead = read(pipe_fd[0], buffer, sizeof(buffer) - 1);
+        if (bytesRead > 0 && *packet->isGameRunning) {
+            buffer[bytesRead] = '\0'; 
+            printf("Received: %s\n", buffer); fflush(stdout);
+            sscanf(buffer, "%d %d %d", &packet->map->stones[packet->map->currentStones].x, 
+                                        &packet->map->stones[packet->map->currentStones].y, 
+                                        &packet->map->stones[packet->map->currentStones].duration);
+            packet->map->stones[packet->map->currentStones].x *= 2;
+            packet->map->currentStones++;
+            for(int i = 0; i < packet->map->currentStones; ++i) {
+                printf("%d: %d, %d\n", i, packet->map->stones[i].x, packet->map->stones[i].y);
             }
         }
-
-        close(pipe_fd[0]); 
-
-        waitpid(pid2, NULL, 0);
-        printf("A sair\n");
-        fflush(stdout);
     }
+
+    close(pipe_fd[0]); 
+    wait(NULL);
 }
 
 int generateRandom(int min, int max) {

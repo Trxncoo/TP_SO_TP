@@ -55,6 +55,7 @@ typedef struct {
 typedef struct {
     int interval;
     int duration;
+    pthread_t *botThread;
 } Bot;
 
 typedef struct {
