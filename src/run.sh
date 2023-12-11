@@ -14,12 +14,12 @@ make
 
 gnome-terminal  --full-screen -- bash -c "./motor; exit"
 sleep 0.5
-gnome-terminal  --full-screen -- bash -c "./jogoUI nome1; exit"
+gnome-terminal  --full-screen -- bash -c "./jogoUI João; exit"
 sleep 0.1
-gnome-terminal  --full-screen -- bash -c "./jogoUI nome2; exit"
+gnome-terminal  --full-screen -- bash -c "./jogoUI Pedro; exit"
 sleep 0.1
-gnome-terminal  --full-screen -- bash -c "./jogoUI nome3; exit"
+gnome-terminal  --full-screen -- bash -c "./jogoUI Gonçalo; exit"
 sleep 0.1
-gnome-terminal  --full-screen -- bash -c "./jogoUI nome4; exit"
+gnome-terminal  --full-screen -- bash -c "./jogoUI António; exit"
 sleep 0.1
-gnome-terminal  --full-screen -- bash -c "./jogoUI nome5; exit"
+gnome-terminal  --full-screen -- bash -c "./jogoUI Mário; exit"
