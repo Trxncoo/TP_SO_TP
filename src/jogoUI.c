@@ -12,13 +12,17 @@ void playersCommand(KeyboardHandlerPacket *packet);
 int findMyself(KeyboardHandlerPacket *packet);
 void exitCommand(KeyboardHandlerPacket *packet);
 void *handleEvents(void *args);
+void startEvent(KeyboardHandlerPacket *packet, pthread_t *threadId);
+
+WINDOW *topWindow;
+WINDOW *bottomWindow;
 
 int main(int argc, char* argv[]) {
     Player player = {}; 
     PlayerArray players = {};
     Map map = {};
     int jogoUIFd, motorFd;
-    int isGameRunning = 1, currentLevel = 1;
+    int isGameRunning = 0, currentLevel = 1;
     KeyboardHandlerPacket keyboardPacket = {&players, &map, NULL, NULL, 1, &motorFd, &jogoUIFd, &isGameRunning, &currentLevel};
     pthread_t eventHandler;
 
@@ -26,33 +30,63 @@ int main(int argc, char* argv[]) {
 
     registerUser(&motorFd, &jogoUIFd, &player);
 
-    if(pthread_create(&eventHandler, NULL, handleEvents, (void*)&keyboardPacket)) {
-        PERROR("Creating thread");
-        exit(EXIT_FAILURE);
-    }
+    startEvent(&keyboardPacket, &eventHandler);
 
-
-/*
+    sleep(6);
     initScreen();
 
-    WINDOW *topWindow = newwin(MAX_HEIGHT + 2, MAX_WIDTH + 2, 0, (COLS - MAX_WIDTH + 2) / 2);
-    WINDOW *bottomWindow= newwin(COMMAND_MAX_HEIGHT, COMMAND_MAX_WIDTH, (MAX_HEIGHT + PADDING), (COLS - COMMAND_MAX_WIDTH) / 2);
-    WINDOW *sideWindow = newwin(30,30,10,10);
-    WINDOW *windows[N_WINDOWS] = {topWindow, bottomWindow};
+    topWindow = newwin(MAX_HEIGHT + 2, MAX_WIDTH + 1, PADDING, (COLS - MAX_WIDTH) / 2);
+    bottomWindow = newwin(COMMAND_MAX_HEIGHT, COMMAND_MAX_WIDTH, (MAX_HEIGHT + 2 + PADDING), (COLS - COMMAND_MAX_WIDTH + 1) / 2);
+
     box(topWindow, 0, 0);
     box(bottomWindow, 0, 0);
-    box(sideWindow, 0, 0);
-        
-    ungetch('.');
-    getch();  
+    refresh();
 
-    refreshAll(topWindow, bottomWindow, sideWindow);
-*/
-    char commandBuffer[COMMAND_BUFFER_SIZE];
-    while(1) {
-        readCommand(commandBuffer, sizeof(commandBuffer));
-        handleCommand(commandBuffer, &keyboardPacket);
+    wrefresh(topWindow);
+    wrefresh(bottomWindow);
+
+    while(currentLevel < 4) {
+        isGameRunning = 1;
+        while(isGameRunning) {
+            int key;
+            while((key = getch())) {
+
+                switch(key) {
+                    case KEY_UP:
+                        players.array[findMyself(&keyboardPacket)].yCoordinate++;
+                        break;
+
+                    case KEY_DOWN:
+                        players.array[findMyself(&keyboardPacket)].yCoordinate++;
+                        break;
+
+                    case KEY_LEFT:
+                        players.array[findMyself(&keyboardPacket)].xCoordinate -= 2;
+                        break;
+
+                    case KEY_RIGHT:
+                        players.array[findMyself(&keyboardPacket)].xCoordinate += 2;
+                        break;
+
+                    case 32:
+                        char commandBuffer[COMMAND_BUFFER_SIZE];
+                        mvwprintw(bottomWindow, 7, 1, "%s" ,"-->");
+                        readCommand(commandBuffer, sizeof(commandBuffer));
+                        handleCommand(commandBuffer, &keyboardPacket);
+                }
+
+                int myPos = findMyself(&keyboardPacket);
+                Packet move;
+                move.type = UPDATE_POS;
+                move.data.player = keyboardPacket.players->array[myPos];
+                writeToPipe(*keyboardPacket.motorFd, &move, sizeof(Packet));
+                wrefresh(topWindow);
+                wrefresh(bottomWindow);
+            }
+        }
     }
+
+
 
     if(pthread_join(eventHandler, NULL) != 0) {
         PERROR("Join thread");
@@ -65,6 +99,13 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
+void startEvent(KeyboardHandlerPacket *packet, pthread_t *threadId) {
+    if(pthread_create(threadId, NULL, handleEvents, (void*)packet)) {
+        PERROR("Creating thread");
+        exit(EXIT_FAILURE);
+    }
+}
+
 void *handleEvents(void *args) {
     KeyboardHandlerPacket *eventPacket = (KeyboardHandlerPacket*)args;
     Packet packet;
@@ -73,30 +114,33 @@ void *handleEvents(void *args) {
         readFromPipe(*(eventPacket->jogoUIFd), &packet, sizeof(Packet));
         switch(packet.type) {
             case KICK:
-                printf("%s\n", packet.data.content);
-                
+                wclear(bottomWindow);
+                box(bottomWindow, 0, 0);
+                mvwprintw(bottomWindow, 1, 1, "%s\n", packet.data.content);
+                wrefresh(bottomWindow);
+                sleep(5);
                 close(*(eventPacket->motorFd));
                 close(*(eventPacket->jogoUIFd));
                 unlink(eventPacket->players->array[myId].pipe);
                 exit(0);
 
             case MESSAGE:
-                printf("%s\n", packet.data.content);
+                wclear(bottomWindow);
+                box(bottomWindow, 0, 0);
+                mvwprintw(bottomWindow, 1, 1, "%s\n", packet.data.content);
+                wrefresh(bottomWindow);
                 break;
 
             case SYNC:
                 *(eventPacket->players) = packet.data.syncPacket.players;
-                int myTempId=-1;
-                for(int i = 0; i < eventPacket->players->nPlayers; ++i) {
-                    printf("%s\n", eventPacket->players->array[i].name);
-                    if(getpid()==eventPacket->players->array[i].pid) {
-                        printf("Sou o jogador %d\t%s\n",i+1, eventPacket->players->array[i].name);
-                    }
-                }
+                *(eventPacket->map) = packet.data.syncPacket.map;
                 break;
             
             case END:
-                printf("%s\n", packet.data.content);
+                wclear(bottomWindow);
+                box(bottomWindow, 0, 0);
+                mvwprintw(bottomWindow, 1, 1, "%s\n", packet.data.content);
+                wrefresh(bottomWindow);
                 sleep(2);
                 close(*eventPacket->motorFd);
                 close(*eventPacket->jogoUIFd);
@@ -106,7 +150,7 @@ void *handleEvents(void *args) {
             default:
                 break;
         }
-        
+        printMap(topWindow, eventPacket->map);
     }
 }
 
@@ -117,11 +161,6 @@ void registerUser(int *motorFd, int *jogoUIFd, Player *player) {
 
     *jogoUIFd = openPipeForReading(player->pipe);
     readFromPipe(*jogoUIFd, &confirmationFlag, sizeof(int));
-    if(confirmationFlag) {
-        printf("Nome disponivel, vai jogar\n");
-    } else {
-        printf("Nome ja existe, registado como espetador\n");
-    }
 }
 
 void initJogoUI(Player* player, const int argc, char* argv[]) {
@@ -150,22 +189,19 @@ void initPlayer(Player* player, const int argc, char* argv[]) {
     player->isPlaying = 0;
 }
 
-
-void *handleKeyboard(void *args) {
-    KeyboardHandlerPacket *packet = (KeyboardHandlerPacket*)args;
-    char commandBuffer[COMMAND_BUFFER_SIZE];
-    while(1) {
-        readCommand(commandBuffer, sizeof(commandBuffer));
-        handleCommand(commandBuffer, packet);
-    }
-}
-
 void readCommand(char *command, size_t commandSize) {
-    fgets(command, commandSize, stdin);
-    command[strcspn(command, "\n")] = 0;
+    echo();
+    curs_set(2);
+    wmove(bottomWindow, 7, 5);
+    wgetnstr(bottomWindow, command, commandSize);
+    noecho();
+    curs_set(0);
 }
 
 int handleCommand(char *input, KeyboardHandlerPacket *packet) {
+    wclear(bottomWindow);
+    box(bottomWindow, 0, 0);
+    wrefresh(bottomWindow);
 	char command[COMMAND_BUFFER_SIZE];
     char arg1[COMMAND_BUFFER_SIZE], arg2[COMMAND_BUFFER_SIZE];
     int nArgs = sscanf(input, "%s %s %[^\n]", command, arg1, arg2);
@@ -176,7 +212,7 @@ int handleCommand(char *input, KeyboardHandlerPacket *packet) {
     } else if(!strcmp(command, "exit") && nArgs == 1) {
         exitCommand(packet);
     } else {
-        printf("Comando Invalido\n");
+        mvwprintw(bottomWindow, 1, 1, "Comando Invalido\n");
     } 
     return 1;
 }
@@ -195,7 +231,7 @@ void msgCommand(KeyboardHandlerPacket *packet, char *arg1, char *arg2) {
 
 void playersCommand(KeyboardHandlerPacket *packet) {
     for(int i = 0; i < packet->players->nPlayers; ++i) {
-        printf("Nome | Icone: %s | %c\n", packet->players->array[i].name, packet->players->array[i].icone);
+        mvwprintw(bottomWindow, i + 1, 1, "Nome | Icone: %s | %c\n", packet->players->array[i].name, packet->players->array[i].icone);
     }
 }
 

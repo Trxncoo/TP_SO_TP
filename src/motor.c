@@ -16,12 +16,18 @@ void rbmCommand(KeyboardHandlerPacket *packet);
 void *handleKeyboard(void *args); // KeyboardHandlerThread
 void *handleEvent(void *args);    // EventHandlerThread
 void *handleBot(void *args);      // BotHandlerThread
+void *handleBmovs(void *args);
 
 // Initizalizers
 void initMotor(int *motorFd, int *inscricao, int *nplayers, int *duracao, int *decremento);
 void initBot(KeyboardHandlerPacket *packet);
 void initBmov(KeyboardHandlerPacket *packet, Bmov *bmov);
 void initPlayerLocations(KeyboardHandlerPacket *packet);
+void initSync(PlayerArray *players, Map *map);
+void startBots(KeyboardHandlerPacket *packet, pthread_t *threadId);
+void startBmovs(KeyboardHandlerPacket *packet, pthread_t *threadId);
+void startKeyboard(KeyboardHandlerPacket *packet, pthread_t *threadId);
+void startEvents(KeyboardHandlerPacket *packet, pthread_t *threadId);
 
 // Helpers
 int isNameAvailable(const PlayerArray *players, const char *name);
@@ -36,71 +42,46 @@ void addBot(KeyboardHandlerPacket *packet, int interval, int duration);
 int listBmovs(KeyboardHandlerPacket *packet);
 void jogoUIExit(PlayerArray *players, const char *name);
 void runBots(KeyboardHandlerPacket *packet, int numBots, int botParams[][2]);
+int checkBmovCollision(PlayerArray *players, int currentX, int currentY, Map *map);
+void bmovWalk(Bmov *bmov, PlayerArray *players, Map *map);
 
 int main(int argc, char* argv[]) {  
     int inscricao = 0, nplayers = 0, duracao = 0, decremento = 0; 
-    int motorFd = 0, currentLevel = 1, isGameRunning = 1; 
+    int motorFd = 0, currentLevel = 1, isGameRunning = 0; 
     PlayerArray players = {};
     Map map = {}; 
     BotArray bots = {}; 
     BmovArray bmovs = {}; 
     KeyboardHandlerPacket keyboardPacket = {&players, &map, &bots, &bmovs, 1, &motorFd, NULL, &isGameRunning, &currentLevel};
-    pthread_t keyBoardHandlerThread, eventHandlerThread, botHandlerThread;
+    pthread_t keyBoardHandlerThread, eventHandlerThread, botHandlerThread, bmovHandlerThread;
 
     initMotor(&motorFd, &inscricao, &nplayers, &duracao, &decremento);
     
-    if(pthread_create(&keyBoardHandlerThread, NULL, handleKeyboard, (void*)&keyboardPacket) != 0) {
-        PERROR("Creating thread");
-        exit(EXIT_FAILURE);
-    }
+    startKeyboard(&keyboardPacket, &keyBoardHandlerThread);
 
     playerLobby(&keyboardPacket, inscricao, nplayers);
 
-    if(pthread_create(&eventHandlerThread, NULL, handleEvent, (void*)&keyboardPacket) != 0) {
-        PERROR("Creating thread");
-        exit(EXIT_FAILURE);
+    startEvents(&keyboardPacket, &eventHandlerThread);
+
+    while(currentLevel < 4) {
+        isGameRunning = 1;
+        readMapFromFile(&map, "map.txt"); //depois temos de mudar consoante o nivel
+        initPlayerLocations(&keyboardPacket);
+        initSync(&players, &map);
+        startBots(&keyboardPacket, &botHandlerThread);
+        startBmovs(&keyboardPacket, &bmovHandlerThread);
+        while(isGameRunning) {
+            
+            // print on screen
+        }
     }
 
-    SynchronizePacket syncPacket = {players, map};
-    Packet packet;
-    packet.type = SYNC;
-    packet.data.syncPacket = syncPacket;
-    for(int i = 0; i < players.nPlayers; ++i) {
-        players.playerFd[i] = openPipeForWriting(players.array[i].pipe);
-        writeToPipe(players.playerFd[i], &packet, sizeof(Packet));
-    }
 
-    readMapFromFile(&map, "map.txt");
-    initPlayerLocations(&keyboardPacket);
+       
+
     
-    for(int i = 0; i < players.nPlayers; ++i) {
-        int x = players.array[i].xCoordinate;
-        int y = players.array[i].yCoordinate;
-        char icone = players.array[i].icone;
-        map.array[y][x] = icone;
-    }
 
-    for(int i = 0; i < MAX_HEIGHT; ++i) {
-        for(int j = 0; j < MAX_WIDTH; ++j) {
-            printf("%c", map.array[i][j]);
-        }
-    }
 
-    if(pthread_create(&botHandlerThread, NULL, handleBot, (void*)&keyboardPacket) != 0) {
-        PERROR("Creating thread");
-        exit(EXIT_FAILURE);
-    }    
-    sleep(10);
-    isGameRunning = 0;
-    printf("Os bots devem ter acabado\n");
-    for(int i = 0; i < map.currentStones; ++i) {
-        map.array[map.stones[i].y][map.stones[i].x] = 'P';
-    }
-    for(int i = 0; i < MAX_HEIGHT; ++i) {
-        for(int j = 0; j < MAX_WIDTH; ++j) {
-            printf("%c", map.array[i][j]);
-        }
-    }
     /*
     initScreen();
 
@@ -148,6 +129,45 @@ int main(int argc, char* argv[]) {
 
     unlink(JOGOUI_TO_MOTOR_PIPE);
     return 0;
+}
+
+void startKeyboard(KeyboardHandlerPacket *packet, pthread_t *threadId) {
+    if(pthread_create(threadId, NULL, handleKeyboard, (void*)packet) != 0) {
+        PERROR("Creating thread");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void startEvents(KeyboardHandlerPacket *packet, pthread_t *threadId) {
+    if(pthread_create(threadId, NULL, handleEvent, (void*)packet) != 0) {
+        PERROR("Creating thread");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void startBots(KeyboardHandlerPacket *packet, pthread_t *threadId) {
+    if(pthread_create(threadId, NULL, handleBot, (void*)packet) != 0) {
+        PERROR("Creating thread");
+        exit(EXIT_FAILURE);
+    } 
+}
+
+void startBmovs(KeyboardHandlerPacket *packet, pthread_t *threadId) {
+    if(pthread_create(threadId, NULL, handleBmovs, (void*)packet) != 0) {
+        PERROR("Creating thread");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void initSync(PlayerArray *players, Map *map) {
+    SynchronizePacket syncPacket = {*players, *map};
+    Packet packet;
+    packet.type = SYNC;
+    packet.data.syncPacket = syncPacket;
+    for(int i = 0; i < players->nPlayers; ++i) {
+        players->playerFd[i] = openPipeForWriting(players->array[i].pipe);
+        writeToPipe(players->playerFd[i], &packet, sizeof(Packet));
+    }
 }
 
 void *handleBot(void *args) {
@@ -255,10 +275,29 @@ void *handleEvent(void *args) {
         switch(typePacket.type) {
             case EXIT:
                 jogoUIExit(players, typePacket.data.content);
-                printf("Jogador %s saiu do jogo\n", typePacket.data.content);
+                char message[100];
+                sprintf(message, "Jogador %s saiu do jogo", typePacket.data.content);
+                printf("%s\n", message);
+                Packet msg;
+                msg.type = MESSAGE;
+                strcpy(msg.data.content, message);
+                for(int i = 0; i < players->nPlayers; ++i) {
+                    writeToPipe(players->playerFd[i], &msg, sizeof(msg));
+                }
+                break;
+
+            case UPDATE_POS:
+                pid_t playerPid = typePacket.data.player.pid;
+                for(int i = 0; i < packet->players->nPlayers; ++i) {
+                    if(playerPid == packet->players->array[i].pid) {
+                        packet->players->array[i].xCoordinate = typePacket.data.player.xCoordinate;
+                        packet->players->array[i].yCoordinate = typePacket.data.player.yCoordinate;
+                        packet->map->array[typePacket.data.player.yCoordinate][typePacket.data.player.yCoordinate] = packet->players->array[i].icone;
+                    }
+                }
                 break;
         }
-
+        
         syncPlayers(players);
     }
 }
@@ -318,55 +357,69 @@ int handleCommand(KeyboardHandlerPacket *packet, char *input) {
     return 1;
 }
 
-void handleBmovs(KeyboardHandlerPacket* packet) {
-    while(packet->bmovs->nbmovs>0) {
+void *handleBmovs(void *args) {
+    KeyboardHandlerPacket *packet = (KeyboardHandlerPacket*)args;
+    BmovArray *bmovs = packet->bmovs;
+    PlayerArray *players = packet->players;
+    Map *map = packet->map;
+    while(*packet->isGameRunning) { //  todo: adicionar mutex
         sleep(1);
-        for(int i=0;i<packet->bmovs->nbmovs;i++) {
-                int tempIsAvailable=1;
-            do {
-                int side = rand() % 4 +1; //1 left 2 right 3 up 4 down
-                //check available for players
-                int tempX, tempY;
-                tempX = packet->bmovs->bmovs[i].x;
-                tempY = packet->bmovs->bmovs[i].y;
-                switch(side) {
-                    case 1:
-                        tempX+=2;
-                        break;
-                    case 2:
-                        tempX-=2;
-                        break;
-                    case 3:
-                        tempY++;
-                        break;
-                    case 4:
-                        tempY--;
-                        break;
-                    default:
-                        printf("rand invalido");
-                        exit(0);
-                        break;
-                }
-                for(int j = 0; j<packet->players->nPlayers;j++) {
-                    if(tempX == packet->players->array[i].xCoordinate
-                    && tempY == packet->players->array[i].yCoordinate) {
-                        tempIsAvailable=0;
-                        break;
-                    }
-                }
-                if(tempIsAvailable) {
-                    if(tempX < 1
-                    || tempY < 1
-                    || tempX > MAX_WIDTH
-                    || tempY > MAX_HEIGHT) {
-                        tempIsAvailable =0;
-                    }
-                }
-                //TODO nao sei se o mapa ta width2x ou n so falta ver isso
-
-            }while(!tempIsAvailable);
+        printf("Tick\n");
+        fflush(stdout);
+        for(int i = 0; i < bmovs->nbmovs; ++i) {
+            bmovWalk(&bmovs->bmovs[i], players, map);
+            printf("Bmov n%d: %d %d\n", i, bmovs->bmovs[i].x, bmovs->bmovs[i].y);
+            fflush(stdout);
         }
     }
+    printf("Terminou os bmovs\n");
+}
+
+void bmovWalk(Bmov *bmov, PlayerArray *players, Map *map) {
+    int isValidPosition = 1;
+    int currentX = bmov->x, currentY = bmov->y;
+    do {
+        int side = rand() % 4 + 1;
+        switch(side) {
+            case 1:
+                currentX += 2;
+                break;
+            case 2:
+                currentX -= 2;
+                break;
+            case 3:
+                currentY++;
+                break;
+            case 4:
+                currentY--;
+                break;
+            default:
+                printf("rand invalido");
+                break;
+        }
+        isValidPosition = checkBmovCollision(players, currentX, currentY, map);
+    }while(!isValidPosition);
+
+    bmov->x = currentX;
+    bmov->y = currentY;
+}
+
+int checkBmovCollision(PlayerArray *players, int currentX, int currentY, Map *map) {
+    for(int i = 0; i < players->nPlayers; ++i) {
+        if(currentX == players->array[i].xCoordinate && currentY == players->array[i].yCoordinate) {
+            return 0;
+        }
+    }
+
+    if(currentX < 1 || currentY < 1 || currentX > MAX_WIDTH || currentY > MAX_HEIGHT) {
+        return 0;
+    }
+
+    if(map->array[currentY][currentX] == '#') {
+        return 0;
+    }
+
+    return 1;
 }
 
 void usersCommand(KeyboardHandlerPacket *packet) {
@@ -387,13 +440,21 @@ void kickCommand(KeyboardHandlerPacket *packet, const char *name) {
         if(!strcmp(packet->players->array[i].name, name)) {
             Packet packetSender;
             packetSender.type = KICK;
-            strcpy(packetSender.data.content, "Bye Bye");
+            strcpy(packetSender.data.content, "Voce foi expulso pelo motor");
             int fd = openPipeForWriting(packet->players->array[i].pipe);
             writeToPipe(fd, &packetSender, sizeof(Packet));
             close(fd);
             packet->players->array[i] = packet->players->array[packet->players->nPlayers - 1];
             packet->players->playerFd[i] = packet->players->playerFd[packet->players->nPlayers - 1];
             packet->players->nPlayers--;
+            Packet msg;
+            msg.type = MESSAGE;
+            char message[100];
+            sprintf(message, "O jogador %s foi expulso do jogo", name);
+            strcpy(msg.data.content, message);
+            for(int i = 0; i < packet->players->nPlayers; ++i) {
+                writeToPipe(packet->players->playerFd[i], &msg, sizeof(Packet));
+            }
             syncPlayers(packet->players);
             return;
         }
@@ -401,13 +462,11 @@ void kickCommand(KeyboardHandlerPacket *packet, const char *name) {
 }
 
 void endCommand(KeyboardHandlerPacket *packet) {
+    Packet packetSender;
+    packetSender.type = END;
+    strcpy(packetSender.data.content, "O jogo foi terminado");
     for(int i = 0; i < packet->players->nPlayers; ++i) {
-        Packet packetSender;
-        packetSender.type = END;
-        strcpy(packetSender.data.content, "O jogo foi terminado");
-        int fd = openPipeForWriting(packet->players->array[i].pipe);
-        writeToPipe(fd, &packetSender, sizeof(Packet));
-        close(fd);
+        writeToPipe(packet->players->playerFd[i], &packetSender, sizeof(Packet));
     }
     close(*packet->motorFd);
     unlink(JOGOUI_TO_MOTOR_PIPE);
