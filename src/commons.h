@@ -107,19 +107,7 @@ union Data {
     char content[COMMAND_BUFFER_SIZE];
     SynchronizePacket syncPacket;
     Player player;
-    EntityArray entities;
 };
-
-typedef struct {
-    char icone;
-    int x;
-    int y;
-} Entity;
-
-typedef struct {
-    Entity entities[50];
-    int nEntities;
-} EntityArray;
 
 typedef struct {
     MessageType type;

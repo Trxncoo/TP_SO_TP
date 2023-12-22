@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
 
                 switch(key) {
                     case KEY_UP:
-                        players.array[findMyself(&keyboardPacket)].yCoordinate++;
+                        players.array[findMyself(&keyboardPacket)].yCoordinate--;
                         break;
 
                     case KEY_DOWN:
@@ -134,6 +134,7 @@ void *handleEvents(void *args) {
             case SYNC:
                 *(eventPacket->players) = packet.data.syncPacket.players;
                 *(eventPacket->map) = packet.data.syncPacket.map;
+                printMap(topWindow, eventPacket->map);
                 break;
             
             case END:
@@ -150,7 +151,6 @@ void *handleEvents(void *args) {
             default:
                 break;
         }
-        printMap(topWindow, eventPacket->map);
     }
 }
 

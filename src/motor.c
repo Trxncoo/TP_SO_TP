@@ -32,7 +32,7 @@ void startEvents(KeyboardHandlerPacket *packet, pthread_t *threadId);
 // Helpers
 int isNameAvailable(const PlayerArray *players, const char *name);
 void readMapFromFile(Map *map, const char *filename);
-void syncPlayers(PlayerArray *players);
+void syncPlayers(PlayerArray *players, Map *map);
 void playerLobby(KeyboardHandlerPacket *keyboardPacket, int inscricao, int nplayers);
 void getPlayer(PlayerArray *players, int motorFd);
 void getEnvs(int* inscricao, int* nplayers, int* duracao, int* decremento);
@@ -290,15 +290,17 @@ void *handleEvent(void *args) {
                 pid_t playerPid = typePacket.data.player.pid;
                 for(int i = 0; i < packet->players->nPlayers; ++i) {
                     if(playerPid == packet->players->array[i].pid) {
+                        packet->map->array[packet->players->array[i].yCoordinate][packet->players->array[i].xCoordinate] = ' ';
                         packet->players->array[i].xCoordinate = typePacket.data.player.xCoordinate;
                         packet->players->array[i].yCoordinate = typePacket.data.player.yCoordinate;
-                        packet->map->array[typePacket.data.player.yCoordinate][typePacket.data.player.yCoordinate] = packet->players->array[i].icone;
+                        printf("Pos: %d/%d\n", typePacket.data.player.xCoordinate, typePacket.data.player.yCoordinate);
+                        packet->map->array[typePacket.data.player.yCoordinate][typePacket.data.player.xCoordinate] = packet->players->array[i].icone;
                     }
                 }
                 break;
         }
         
-        syncPlayers(players);
+        syncPlayers(players, packet->map);
     }
 }
 
@@ -315,12 +317,12 @@ void jogoUIExit(PlayerArray *players, const char *name) {
     }
 }
 
-void syncPlayers(PlayerArray *players) {
+void syncPlayers(PlayerArray *players, Map *map) {
     for(int i = 0; i < players->nPlayers; ++i) {
         Packet packetSender;
         packetSender.type = SYNC;
         packetSender.data.syncPacket.players = *players;
-        printf("%d\n", packetSender.data.syncPacket.players.nPlayers);
+        packetSender.data.syncPacket.map = *map;
         writeToPipe(players->playerFd[i], &packetSender, sizeof(Packet));
     }
 }
@@ -455,7 +457,7 @@ void kickCommand(KeyboardHandlerPacket *packet, const char *name) {
             for(int i = 0; i < packet->players->nPlayers; ++i) {
                 writeToPipe(packet->players->playerFd[i], &msg, sizeof(Packet));
             }
-            syncPlayers(packet->players);
+            syncPlayers(packet->players, packet->map);
             return;
         }
     }
