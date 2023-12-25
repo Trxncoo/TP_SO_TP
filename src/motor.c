@@ -293,7 +293,6 @@ void *handleEvent(void *args) {
                         packet->map->array[packet->players->array[i].yCoordinate][packet->players->array[i].xCoordinate] = ' ';
                         packet->players->array[i].xCoordinate = typePacket.data.player.xCoordinate;
                         packet->players->array[i].yCoordinate = typePacket.data.player.yCoordinate;
-                        printf("Pos: %d/%d\n", typePacket.data.player.xCoordinate, typePacket.data.player.yCoordinate);
                         packet->map->array[typePacket.data.player.yCoordinate][typePacket.data.player.xCoordinate] = packet->players->array[i].icone;
                     }
                 }
@@ -369,10 +368,11 @@ void *handleBmovs(void *args) {
         printf("Tick\n");
         fflush(stdout);
         for(int i = 0; i < bmovs->nbmovs; ++i) {
+            map->array[bmovs->bmovs[i].y][bmovs->bmovs[i].x] = ' ';
             bmovWalk(&bmovs->bmovs[i], players, map);
-            printf("Bmov n%d: %d %d\n", i, bmovs->bmovs[i].x, bmovs->bmovs[i].y);
-            fflush(stdout);
+            map->array[bmovs->bmovs[i].y][bmovs->bmovs[i].x] = 'B';
         }
+        syncPlayers(players, map);
     }
     printf("Terminou os bmovs\n");
 }
@@ -601,8 +601,10 @@ void initBot(KeyboardHandlerPacket *packet) {
             packet->map->stones[packet->map->currentStones].x *= 2;
             packet->map->currentStones++;
             for(int i = 0; i < packet->map->currentStones; ++i) {
+                packet->map->array[packet->map->stones[i].y][packet->map->stones[i].x] = 'P';
                 printf("%d: %d, %d\n", i, packet->map->stones[i].x, packet->map->stones[i].y);
             }
+            syncPlayers(packet->players, packet->map);
         }
     }
 
