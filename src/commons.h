@@ -101,6 +101,8 @@ typedef struct {
 typedef struct {
     PlayerArray players;
     Map map;
+    int isGameRunning;
+    int currentLevel;
 } SynchronizePacket;
 
 union Data {

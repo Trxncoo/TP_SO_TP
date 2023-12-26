@@ -46,7 +46,6 @@ int main(int argc, char* argv[]) {
     wrefresh(bottomWindow);
 
     while(currentLevel < 4) {
-        isGameRunning = 1;
         while(isGameRunning) {
             int key;
             while((key = getch())) {
@@ -134,6 +133,8 @@ void *handleEvents(void *args) {
             case SYNC:
                 *(eventPacket->players) = packet.data.syncPacket.players;
                 *(eventPacket->map) = packet.data.syncPacket.map;
+                *(eventPacket->currentLevel) = packet.data.syncPacket.currentLevel;
+                *(eventPacket->isGameRunning) = packet.data.syncPacket.isGameRunning;
                 printMap(topWindow, eventPacket->map);
                 break;
             

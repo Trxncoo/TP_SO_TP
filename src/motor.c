@@ -23,7 +23,7 @@ void initMotor(int *motorFd, int *inscricao, int *nplayers, int *duracao, int *d
 void initBot(KeyboardHandlerPacket *packet);
 void initBmov(KeyboardHandlerPacket *packet, Bmov *bmov);
 void initPlayerLocations(KeyboardHandlerPacket *packet);
-void initSync(PlayerArray *players, Map *map);
+void initSync(PlayerArray *players, Map *map, int *isGameRunning, int *currentLevel);
 void startBots(KeyboardHandlerPacket *packet, pthread_t *threadId);
 void startBmovs(KeyboardHandlerPacket *packet, pthread_t *threadId);
 void startKeyboard(KeyboardHandlerPacket *packet, pthread_t *threadId);
@@ -32,7 +32,7 @@ void startEvents(KeyboardHandlerPacket *packet, pthread_t *threadId);
 // Helpers
 int isNameAvailable(const PlayerArray *players, const char *name);
 void readMapFromFile(Map *map, const char *filename);
-void syncPlayers(PlayerArray *players, Map *map);
+void syncPlayers(PlayerArray *players, Map *map, int *isGameRunning, int *currentLevel);
 void playerLobby(KeyboardHandlerPacket *keyboardPacket, int inscricao, int nplayers);
 void getPlayer(PlayerArray *players, int motorFd);
 void getEnvs(int* inscricao, int* nplayers, int* duracao, int* decremento);
@@ -48,6 +48,7 @@ void bmovWalk(Bmov *bmov, PlayerArray *players, Map *map);
 int main(int argc, char* argv[]) {  
     int inscricao = 0, nplayers = 0, duracao = 0, decremento = 0; 
     int motorFd = 0, currentLevel = 1, isGameRunning = 0; 
+    int tempo = 0;
     PlayerArray players = {};
     Map map = {}; 
     BotArray bots = {}; 
@@ -65,15 +66,25 @@ int main(int argc, char* argv[]) {
 
     while(currentLevel < 4) {
         isGameRunning = 1;
-        readMapFromFile(&map, "map.txt"); //depois temos de mudar consoante o nivel
+        printf("Nivel: %d\n", currentLevel);
+        char mapBuffer[100];
+        sprintf(mapBuffer, "map%d.txt", currentLevel);
+        printf("Mapa: %s\n", mapBuffer);
+        readMapFromFile(&map, mapBuffer); //depois temos de mudar consoante o nivel
+        printf("Read map from file\n");
         initPlayerLocations(&keyboardPacket);
-        initSync(&players, &map);
+        printf("Initialiazed players\n");
+        initSync(&players, &map, &isGameRunning, &currentLevel);
+        printf("Synced players\n");
         startBots(&keyboardPacket, &botHandlerThread);
         startBmovs(&keyboardPacket, &bmovHandlerThread);
-        while(isGameRunning) {
-            
-            // print on screen
-        }
+        tempo = duracao - decremento * currentLevel;
+        sleep(tempo);
+        currentLevel++;
+        isGameRunning = 0;
+        pthread_join(bmovHandlerThread, NULL);
+        pthread_join(botHandlerThread, NULL);
+        printf("Jogo devia terminar\n");
     }
 
 
@@ -159,8 +170,8 @@ void startBmovs(KeyboardHandlerPacket *packet, pthread_t *threadId) {
     }
 }
 
-void initSync(PlayerArray *players, Map *map) {
-    SynchronizePacket syncPacket = {*players, *map};
+void initSync(PlayerArray *players, Map *map, int *isGameRunning, int *curretnLevel) {
+    SynchronizePacket syncPacket = {*players, *map, *isGameRunning, *curretnLevel};
     Packet packet;
     packet.type = SYNC;
     packet.data.syncPacket = syncPacket;
@@ -231,6 +242,7 @@ int isNameAvailable(const PlayerArray *players, const char *name) {
 }
 
 void readMapFromFile(Map *map, const char *filename) {
+    memset(&map->array, 0, sizeof(map->array));
     int fd = open(filename, O_RDONLY);
     if (fd == -1) {
         PERROR("open");
@@ -299,7 +311,7 @@ void *handleEvent(void *args) {
                 break;
         }
         
-        syncPlayers(players, packet->map);
+        syncPlayers(players, packet->map, packet->isGameRunning, packet->currentLevel);
     }
 }
 
@@ -316,12 +328,14 @@ void jogoUIExit(PlayerArray *players, const char *name) {
     }
 }
 
-void syncPlayers(PlayerArray *players, Map *map) {
+void syncPlayers(PlayerArray *players, Map *map, int *isGameRunning, int *currentLevel) {
     for(int i = 0; i < players->nPlayers; ++i) {
         Packet packetSender;
         packetSender.type = SYNC;
         packetSender.data.syncPacket.players = *players;
         packetSender.data.syncPacket.map = *map;
+        packetSender.data.syncPacket.isGameRunning = *isGameRunning;
+        packetSender.data.syncPacket.currentLevel = *currentLevel;
         writeToPipe(players->playerFd[i], &packetSender, sizeof(Packet));
     }
 }
@@ -359,6 +373,7 @@ int handleCommand(KeyboardHandlerPacket *packet, char *input) {
 }
 
 void *handleBmovs(void *args) {
+    printf("Bmovs vao comecar\n");
     KeyboardHandlerPacket *packet = (KeyboardHandlerPacket*)args;
     BmovArray *bmovs = packet->bmovs;
     PlayerArray *players = packet->players;
@@ -372,8 +387,9 @@ void *handleBmovs(void *args) {
             bmovWalk(&bmovs->bmovs[i], players, map);
             map->array[bmovs->bmovs[i].y][bmovs->bmovs[i].x] = 'B';
         }
-        syncPlayers(players, map);
+        syncPlayers(players, map, packet->isGameRunning, packet->currentLevel);
     }
+    bmovs->nbmovs = 0;
     printf("Terminou os bmovs\n");
 }
 
@@ -457,7 +473,7 @@ void kickCommand(KeyboardHandlerPacket *packet, const char *name) {
             for(int i = 0; i < packet->players->nPlayers; ++i) {
                 writeToPipe(packet->players->playerFd[i], &msg, sizeof(Packet));
             }
-            syncPlayers(packet->players, packet->map);
+            syncPlayers(packet->players, packet->map, packet->isGameRunning, packet->currentLevel);
             return;
         }
     }
@@ -558,7 +574,8 @@ void setupCommand(WINDOW* bottomWindow) {
     wmove(bottomWindow, 2, 2);
 }
 
-void initBot(KeyboardHandlerPacket *packet) {    
+void initBot(KeyboardHandlerPacket *packet) {  
+    printf("Bots vao comecar\n");  
     BotArray *bots = packet->bots;
     int pipe_fd[2];
     if(pipe(pipe_fd) == -1){
@@ -604,10 +621,11 @@ void initBot(KeyboardHandlerPacket *packet) {
                 packet->map->array[packet->map->stones[i].y][packet->map->stones[i].x] = 'P';
                 printf("%d: %d, %d\n", i, packet->map->stones[i].x, packet->map->stones[i].y);
             }
-            syncPlayers(packet->players, packet->map);
+            syncPlayers(packet->players, packet->map, packet->isGameRunning, packet->currentLevel);
         }
     }
-
+    printf("Bots vao terminar\n");
+    packet->map->currentStones = 0;
     close(pipe_fd[0]); 
     wait(NULL);
 }
