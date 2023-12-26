@@ -13,6 +13,8 @@ int findMyself(KeyboardHandlerPacket *packet);
 void exitCommand(KeyboardHandlerPacket *packet);
 void *handleEvents(void *args);
 void startEvent(KeyboardHandlerPacket *packet, pthread_t *threadId);
+int checkCanGo(KeyboardHandlerPacket *packet, int direction);
+
 
 WINDOW *topWindow;
 WINDOW *bottomWindow;
@@ -52,19 +54,27 @@ int main(int argc, char* argv[]) {
 
                 switch(key) {
                     case KEY_UP:
-                        players.array[findMyself(&keyboardPacket)].yCoordinate--;
+                        if(!checkCanGo(&keyboardPacket, key)) {
+                            players.array[findMyself(&keyboardPacket)].yCoordinate--;
+                        }
                         break;
 
                     case KEY_DOWN:
-                        players.array[findMyself(&keyboardPacket)].yCoordinate++;
+                       if(!checkCanGo(&keyboardPacket, key)) {
+                            players.array[findMyself(&keyboardPacket)].yCoordinate++;
+                        }
                         break;
 
                     case KEY_LEFT:
-                        players.array[findMyself(&keyboardPacket)].xCoordinate -= 2;
+                        if(!checkCanGo(&keyboardPacket, key)) {
+                            players.array[findMyself(&keyboardPacket)].xCoordinate -= 2;
+                        }
                         break;
 
                     case KEY_RIGHT:
-                        players.array[findMyself(&keyboardPacket)].xCoordinate += 2;
+                        if(!checkCanGo(&keyboardPacket, key)) {
+                            players.array[findMyself(&keyboardPacket)].xCoordinate += 2;
+                        }
                         break;
 
                     case 32:
@@ -95,6 +105,37 @@ int main(int argc, char* argv[]) {
     close(motorFd);
     close(jogoUIFd);
     unlink(player.pipe);
+    return 0;
+}
+
+int checkCanGo(KeyboardHandlerPacket *packet, int direction) {
+    int myX, myY;
+    myX = packet->players->array[findMyself(packet)].xCoordinate;
+    myY = packet->players->array[findMyself(packet)].yCoordinate;
+    
+    switch(direction) {
+        case KEY_UP:
+            myY--;
+            break;
+        case KEY_DOWN:
+            myY++;
+            break;
+        case KEY_LEFT:
+            myX -= 2;
+            break;
+        case KEY_RIGHT:
+            myX += 2;
+            break;
+    }
+    if(packet->map->array[myX][myY]==' ') {
+        for(int i = 0; i < packet->map->currentStones; ++i) {
+            int stoneX = packet->map->stones[i].x;
+            int stoneY = packet->map->stones[i].y;
+            if(myX == stoneX && myY == stoneY) {
+                return 1;
+            }
+        }
+    } return 1;
     return 0;
 }
 
