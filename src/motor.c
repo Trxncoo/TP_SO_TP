@@ -17,7 +17,7 @@ void *handleKeyboard(void *args); // KeyboardHandlerThread
 void *handleEvent(void *args);    // EventHandlerThread
 void *handleBot(void *args);      // BotHandlerThread
 void *handleBmovs(void *args);
-
+void* handleStones(void* args)
 // Initizalizers
 void initMotor(int *motorFd, int *inscricao, int *nplayers, int *duracao, int *decremento);
 void initBot(KeyboardHandlerPacket *packet);
@@ -216,6 +216,23 @@ void addBot(KeyboardHandlerPacket *packet, int interval, int duration) {
         bots->bots[bots->nBots].interval = interval;
         bots->bots[bots->nBots].duration = duration;
         bots->nBots++;
+    }
+}
+
+void* handleStones(void* args) {
+    KeyboardHandlerPacket *packet = (KeyboardHandlerPacket*)args;
+    int toContinue = 1;
+    while(toContinue) {
+        for(int i = 0; i < packet->map->currentStones; ++i) {
+            if(packet->map->stones[i].duration == 0) {
+                currentStoneX = packet->map->stones[i].x;
+                currentStoneY = packet->map->stones[i].y;
+                packet->map->array[currentStoneX][currentStoneY] = ' ';
+            } else {
+                packet->map->stones[i].duration--;
+            }
+        }
+        sleep(1);
     }
 }
 
