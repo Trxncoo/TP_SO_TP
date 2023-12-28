@@ -17,7 +17,7 @@ void *handleKeyboard(void *args); // KeyboardHandlerThread
 void *handleEvent(void *args);    // EventHandlerThread
 void *handleBot(void *args);      // BotHandlerThread
 void *handleBmovs(void *args);
-void* handleStones(void* args)
+void* handleStones(void* args);
 // Initizalizers
 void initMotor(int *motorFd, int *inscricao, int *nplayers, int *duracao, int *decremento);
 void initBot(KeyboardHandlerPacket *packet);
@@ -44,6 +44,8 @@ void jogoUIExit(PlayerArray *players, const char *name);
 void runBots(KeyboardHandlerPacket *packet, int numBots, int botParams[][2]);
 int checkBmovCollision(PlayerArray *players, int currentX, int currentY, Map *map);
 void bmovWalk(Bmov *bmov, PlayerArray *players, Map *map);
+int checkWinner(KeyboardHandlerPacket *packet);
+
 
 int main(int argc, char* argv[]) {  
     int inscricao = 0, nplayers = 0, duracao = 0, decremento = 0; 
@@ -86,51 +88,6 @@ int main(int argc, char* argv[]) {
         pthread_join(botHandlerThread, NULL);
         printf("Jogo devia terminar\n");
     }
-
-
-       
-
-    
-
-
-    /*
-    initScreen();
-
-    WINDOW *topWindow = newwin(MAX_HEIGHT + 2, MAX_WIDTH + 1, PADDING, (COLS - MAX_WIDTH) / 2);
-    WINDOW *bottomWindow= newwin(COMMAND_MAX_HEIGHT, COMMAND_MAX_WIDTH, (MAX_HEIGHT + 2 + PADDING), (COLS - COMMAND_MAX_WIDTH + 1) / 2);
-    WINDOW *sideWindow = newwin(30,30,10,10);
-    WINDOW *windows[N_WINDOWS] = {topWindow, bottomWindow};
-    box(topWindow, 0, 0);
-    box(bottomWindow, 0, 0);
-    box(sideWindow, 0, 0);
-        
-    ungetch('.');
-    getch();  
-
-    refreshAll(topWindow, bottomWindow, sideWindow);
-    readMapFromFile(&map, "map.txt");
-    printMap(topWindow, &map);
-
-    while(2) { //be different 
-        char command[COMMAND_BUFFER_SIZE];  
-        mvwprintw(bottomWindow, 5, 1, "%s", "-->");
-        //setupCommand(bottomWindow);
-        echo();
-        curs_set(2);
-        wmove(bottomWindow, 2, 2);
-        wgetnstr(bottomWindow, command, sizeof(command)-1);
-        noecho();
-        curs_set(0);
-        if(!strcmp(command, "sair")) {
-            exit(0);
-        }
-        handleCommand(command, &keyboardPacket, bottomWindow);
-
-        //mvwprintw(bottomWindow, 3, 3, "%s", command);
-    }
-
-    */
-    
 
     
     if (pthread_join(keyBoardHandlerThread, NULL) != 0) {
@@ -225,8 +182,8 @@ void* handleStones(void* args) {
     while(toContinue) {
         for(int i = 0; i < packet->map->currentStones; ++i) {
             if(packet->map->stones[i].duration == 0) {
-                currentStoneX = packet->map->stones[i].x;
-                currentStoneY = packet->map->stones[i].y;
+                int currentStoneX = packet->map->stones[i].x;
+                int currentStoneY = packet->map->stones[i].y;
                 packet->map->array[currentStoneX][currentStoneY] = ' ';
             } else {
                 packet->map->stones[i].duration--;
@@ -717,4 +674,16 @@ void rbmCommand(KeyboardHandlerPacket *packet) {
 
     bmovs->nbmovs--;
     printf("Bmov removed\n");
+}
+
+int checkWinner(KeyboardHandlerPacket *packet) {
+    int loopSize = packet->players->nPlayers;
+    int winnerX = 0; //se o x for zero siginfica que conseguiu passar
+    for(int i = 0; i < loopSize; ++i) {
+        if(packet->players->array[i].xCoordinate == winnerX) {
+            return i;
+        }
+    }
+    return -1;
+    //devolve -1 se nao houver ninguem ou o indice do vencedor
 }

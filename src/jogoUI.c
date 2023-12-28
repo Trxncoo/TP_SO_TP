@@ -51,28 +51,31 @@ int main(int argc, char* argv[]) {
         while(isGameRunning) {
             int key;
             while((key = getch())) {
-
+                int canGo;
+                if(key==KEY_UP || key==KEY_DOWN || key==KEY_LEFT || key == KEY_RIGHT) {
+                    canGo=checkCanGo(&keyboardPacket, key);
+                }
                 switch(key) {
                     case KEY_UP:
-                        if(!checkCanGo(&keyboardPacket, key)) {
+                        if(!canGo) {
                             players.array[findMyself(&keyboardPacket)].yCoordinate--;
                         }
                         break;
 
                     case KEY_DOWN:
-                       if(!checkCanGo(&keyboardPacket, key)) {
+                       if(!canGo) {
                             players.array[findMyself(&keyboardPacket)].yCoordinate++;
                         }
                         break;
 
                     case KEY_LEFT:
-                        if(!checkCanGo(&keyboardPacket, key)) {
+                        if(!canGo) {
                             players.array[findMyself(&keyboardPacket)].xCoordinate -= 2;
                         }
                         break;
 
                     case KEY_RIGHT:
-                        if(!checkCanGo(&keyboardPacket, key)) {
+                        if(!canGo) {
                             players.array[findMyself(&keyboardPacket)].xCoordinate += 2;
                         }
                         break;
@@ -109,6 +112,7 @@ int main(int argc, char* argv[]) {
 }
 
 int checkCanGo(KeyboardHandlerPacket *packet, int direction) {
+
     int myX, myY;
     myX = packet->players->array[findMyself(packet)].xCoordinate;
     myY = packet->players->array[findMyself(packet)].yCoordinate;
@@ -126,17 +130,15 @@ int checkCanGo(KeyboardHandlerPacket *packet, int direction) {
         case KEY_RIGHT:
             myX += 2;
             break;
+        default:
+            exit(1);
+            
     }
-    if(packet->map->array[myX][myY]==' ') {
-        for(int i = 0; i < packet->map->currentStones; ++i) {
-            int stoneX = packet->map->stones[i].x;
-            int stoneY = packet->map->stones[i].y;
-            if(myX == stoneX && myY == stoneY) {
-                return 1;
-            }
-        }
+    if(packet->map->array[myY][myX]==' ') {
+        return 0;
     } return 1;
-    return 0;
+    
+    //0 se sim 1 se nao
 }
 
 void startEvent(KeyboardHandlerPacket *packet, pthread_t *threadId) {
