@@ -34,7 +34,8 @@ typedef enum {
     EXIT,
     SYNC,
     END,
-    UPDATE_POS
+    UPDATE_POS,
+    PLAYER_WON
 } MessageType;
 
 typedef struct {

@@ -192,6 +192,15 @@ void *handleEvents(void *args) {
                 unlink(eventPacket->players->array[myId].pipe);
                 exit(0);
 
+            case PLAYER_WON:
+                wclear(bottomWindow);
+                box(bottomWindow, 0, 0);
+                mvwprintw(bottomWindow, 1, 1, "O jogador %s ganhou!\n", packet.data.content);                
+                mvwprintw(bottomWindow, 2, 1, "O proximo nivel vai comecar brevemente");
+                wrefresh(bottomWindow);
+                sleep(5);
+                break;
+
             default:
                 break;
         }

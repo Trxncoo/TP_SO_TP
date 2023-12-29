@@ -28,6 +28,7 @@ void startBots(KeyboardHandlerPacket *packet, pthread_t *threadId);
 void startBmovs(KeyboardHandlerPacket *packet, pthread_t *threadId);
 void startKeyboard(KeyboardHandlerPacket *packet, pthread_t *threadId);
 void startEvents(KeyboardHandlerPacket *packet, pthread_t *threadId);
+void startStones(KeyboardHandlerPacket *packet, pthread_t *threadId);
 
 // Helpers
 int isNameAvailable(const PlayerArray *players, const char *name);
@@ -46,6 +47,9 @@ int checkBmovCollision(PlayerArray *players, int currentX, int currentY, Map *ma
 void bmovWalk(Bmov *bmov, PlayerArray *players, Map *map);
 int checkWinner(KeyboardHandlerPacket *packet);
 
+void handle_alarm(int signum) {
+
+}
 
 int main(int argc, char* argv[]) {  
     int inscricao = 0, nplayers = 0, duracao = 0, decremento = 0; 
@@ -56,7 +60,7 @@ int main(int argc, char* argv[]) {
     BotArray bots = {}; 
     BmovArray bmovs = {}; 
     KeyboardHandlerPacket keyboardPacket = {&players, &map, &bots, &bmovs, 1, &motorFd, NULL, &isGameRunning, &currentLevel};
-    pthread_t keyBoardHandlerThread, eventHandlerThread, botHandlerThread, bmovHandlerThread;
+    pthread_t keyBoardHandlerThread, eventHandlerThread, botHandlerThread, bmovHandlerThread, stonesHandlerThread;
 
     initMotor(&motorFd, &inscricao, &nplayers, &duracao, &decremento);
     
@@ -79,17 +83,22 @@ int main(int argc, char* argv[]) {
         initSync(&players, &map, &isGameRunning, &currentLevel);
         printf("Synced players\n");
         startBots(&keyboardPacket, &botHandlerThread);
+        startStones(&keyboardPacket, &stonesHandlerThread);
         startBmovs(&keyboardPacket, &bmovHandlerThread);
         tempo = duracao - decremento * currentLevel;
-        sleep(tempo);
+
+        while(isGameRunning && tempo != 0) {
+            sleep(1);
+        }
         currentLevel++;
         isGameRunning = 0;
         pthread_join(bmovHandlerThread, NULL);
         pthread_join(botHandlerThread, NULL);
+        pthread_join(stonesHandlerThread, NULL);
         printf("Jogo devia terminar\n");
     }
 
-    
+    endCommand(&keyboardPacket);    
     if (pthread_join(keyBoardHandlerThread, NULL) != 0) {
         PERROR("Join thread");
         return EXIT_FAILURE;
@@ -97,6 +106,13 @@ int main(int argc, char* argv[]) {
 
     unlink(JOGOUI_TO_MOTOR_PIPE);
     return 0;
+}
+
+void startStones(KeyboardHandlerPacket *packet, pthread_t *threadId) {
+    if(pthread_create(threadId, NULL, handleStones, (void*)packet) != 0) {
+        PERROR("Creating thread");
+        exit(EXIT_FAILURE);
+    }
 }
 
 void startKeyboard(KeyboardHandlerPacket *packet, pthread_t *threadId) {
@@ -178,13 +194,16 @@ void addBot(KeyboardHandlerPacket *packet, int interval, int duration) {
 
 void* handleStones(void* args) {
     KeyboardHandlerPacket *packet = (KeyboardHandlerPacket*)args;
-    int toContinue = 1;
-    while(toContinue) {
+    while(*packet->isGameRunning) {
         for(int i = 0; i < packet->map->currentStones; ++i) {
+            printf("Duration: %d\n", packet->map->stones[i].duration);
             if(packet->map->stones[i].duration == 0) {
                 int currentStoneX = packet->map->stones[i].x;
                 int currentStoneY = packet->map->stones[i].y;
-                packet->map->array[currentStoneX][currentStoneY] = ' ';
+                packet->map->array[currentStoneY][currentStoneX] = ' ';
+                packet->map->stones[i] = packet->map->stones[packet->map->currentStones - 1];
+                packet->map->currentStones--;
+                printf("Pedra apagada\n");
             } else {
                 packet->map->stones[i].duration--;
             }
@@ -284,8 +303,19 @@ void *handleEvent(void *args) {
                 }
                 break;
         }
-        
         syncPlayers(players, packet->map, packet->isGameRunning, packet->currentLevel);
+        for(int i = 0; i < packet->players->nPlayers; ++i) {
+            if(packet->players->array[i].yCoordinate == 0) {
+                printf("Jogador %s ganhou o jogo\n", packet->players->array[i].name);
+                *packet->isGameRunning = 0;
+                Packet win;
+                win.type = PLAYER_WON;
+                strcpy(win.data.content, packet->players->array[i].name);
+                for(int j = 0; j < packet->players->nPlayers; ++j) {
+                    writeToPipe(packet->players->playerFd[j], &win, sizeof(Packet));
+                }
+            }
+        }
     }
 }
 
