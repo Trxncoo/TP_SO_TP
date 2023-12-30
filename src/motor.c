@@ -46,6 +46,7 @@ void runBots(KeyboardHandlerPacket *packet, int numBots, int botParams[][2]);
 int checkBmovCollision(PlayerArray *players, int currentX, int currentY, Map *map);
 void bmovWalk(Bmov *bmov, PlayerArray *players, Map *map);
 int checkWinner(KeyboardHandlerPacket *packet);
+void updateSpectators(SpectatorHandlerPacket *packet);
 
 void handle_alarm(int signum) {
 
@@ -56,10 +57,12 @@ int main(int argc, char* argv[]) {
     int motorFd = 0, currentLevel = 1, isGameRunning = 0; 
     int tempo = 0;
     PlayerArray players = {};
+    SpectatorArray spectators = {};
     Map map = {}; 
     BotArray bots = {}; 
     BmovArray bmovs = {}; 
-    KeyboardHandlerPacket keyboardPacket = {&players, &map, &bots, &bmovs, 1, &motorFd, NULL, &isGameRunning, &currentLevel};
+    KeyboardHandlerPacket keyboardPacket = {&players, /*&spectators,*/ &map, &bots, &bmovs, 1, &motorFd, NULL, &isGameRunning, &currentLevel};
+    SpectatorHandlerPacket spectatorPacket = {&keyboardPacket, &spectators};
     pthread_t keyBoardHandlerThread, eventHandlerThread, botHandlerThread, bmovHandlerThread, stonesHandlerThread;
 
     initMotor(&motorFd, &inscricao, &nplayers, &duracao, &decremento);
@@ -384,13 +387,14 @@ void *handleBmovs(void *args) {
     Map *map = packet->map;
     while(*packet->isGameRunning) { //  todo: adicionar mutex
         sleep(1);
-        printf("Tick\n");
+        printf("Tick\n");   
         fflush(stdout);
         for(int i = 0; i < bmovs->nbmovs; ++i) {
             map->array[bmovs->bmovs[i].y][bmovs->bmovs[i].x] = ' ';
             bmovWalk(&bmovs->bmovs[i], players, map);
             map->array[bmovs->bmovs[i].y][bmovs->bmovs[i].x] = 'B';
         }
+
         syncPlayers(players, map, packet->isGameRunning, packet->currentLevel);
     }
     bmovs->nbmovs = 0;
@@ -517,7 +521,7 @@ void playerLobby(KeyboardHandlerPacket *keyboardPacket, int inscricao, int nplay
         }
         timeout.tv_sec = (int)timeRemaining;
         timeout.tv_usec = 0;
-        printf("%d\n", timeout.tv_sec);
+        printf("%d\n", (int)timeout.tv_sec);
         int ready = select(motorFd + 1, &readFds, NULL, NULL, &timeout);
 
         switch(ready) {
@@ -717,3 +721,28 @@ int checkWinner(KeyboardHandlerPacket *packet) {
     return -1;
     //devolve -1 se nao houver ninguem ou o indice do vencedor
 }
+
+void updateSpectators(SpectatorHandlerPacket *packet) {
+    int loopSize = packet->spectators->nSpectators;
+    for(int i = 0; i < loopSize; ++i) {
+        Packet packetSender;
+        packetSender.type = SYNC;
+        packetSender.data.syncPacket.players = *(packet->packet->players);
+        packetSender.data.syncPacket.isGameRunning = *(packet->packet->isGameRunning);
+        packetSender.data.syncPacket.currentLevel = *(packet->packet->currentLevel);
+        writeToPipe(packet->spectators->spectatorFd[i], &packetSender, sizeof(Packet));
+        //para usar isto falta fazer initSync para os spectators
+    }
+}
+
+/*void syncPlayers(PlayerArray *players, Map *map, int *isGameRunning, int *currentLevel) {
+    for(int i = 0; i < players->nPlayers; ++i) {
+        Packet packetSender;
+        packetSender.type = SYNC;
+        packetSender.data.syncPacket.players = *players;
+        packetSender.data.syncPacket.map = *map;
+        packetSender.data.syncPacket.isGameRunning = *isGameRunning;
+        packetSender.data.syncPacket.currentLevel = *currentLevel;
+        writeToPipe(players->playerFd[i], &packetSender, sizeof(Packet));
+    }
+}*/
