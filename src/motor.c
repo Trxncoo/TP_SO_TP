@@ -18,6 +18,7 @@ void *handleEvent(void *args);    // EventHandlerThread
 void *handleBot(void *args);      // BotHandlerThread
 void *handleBmovs(void *args);
 void* handleStones(void* args);
+
 // Initizalizers
 void initMotor(int *motorFd, int *inscricao, int *nplayers, int *duracao, int *decremento);
 void initBot(KeyboardHandlerPacket *packet);
@@ -45,28 +46,27 @@ void jogoUIExit(PlayerArray *players, const char *name);
 void runBots(KeyboardHandlerPacket *packet, int numBots, int botParams[][2]);
 int checkBmovCollision(PlayerArray *players, int currentX, int currentY, Map *map);
 void bmovWalk(Bmov *bmov, PlayerArray *players, Map *map);
-int checkWinner(KeyboardHandlerPacket *packet);
-void updateSpectators(SpectatorHandlerPacket *packet);
 
-void handle_alarm(int signum) {
-
-}
+pthread_mutex_t mutex;
 
 int main(int argc, char* argv[]) {  
     int inscricao = 0, nplayers = 0, duracao = 0, decremento = 0; 
     int motorFd = 0, currentLevel = 1, isGameRunning = 0; 
     int tempo = 0;
     PlayerArray players = {};
-    SpectatorArray spectators = {};
     Map map = {}; 
     BotArray bots = {}; 
     BmovArray bmovs = {}; 
-    KeyboardHandlerPacket keyboardPacket = {&players, /*&spectators,*/ &map, &bots, &bmovs, 1, &motorFd, NULL, &isGameRunning, &currentLevel};
-    SpectatorHandlerPacket spectatorPacket = {&keyboardPacket, &spectators};
+    KeyboardHandlerPacket keyboardPacket = {&players, &map, &bots, &bmovs, 1, &motorFd, NULL, &isGameRunning, &currentLevel};
     pthread_t keyBoardHandlerThread, eventHandlerThread, botHandlerThread, bmovHandlerThread, stonesHandlerThread;
 
     initMotor(&motorFd, &inscricao, &nplayers, &duracao, &decremento);
     
+    if (pthread_mutex_init(&mutex, NULL) != 0) {
+        printf("Mutex initialization failed.\n");
+        return 1;
+    }
+
     startKeyboard(&keyboardPacket, &keyBoardHandlerThread);
 
     playerLobby(&keyboardPacket, inscricao, nplayers);
@@ -114,6 +114,8 @@ int main(int argc, char* argv[]) {
         PERROR("Join thread");
         return EXIT_FAILURE;
     }
+
+    pthread_mutex_destroy(&mutex);
 
     unlink(JOGOUI_TO_MOTOR_PIPE);
     return 0;
@@ -297,12 +299,15 @@ void *handleEvent(void *args) {
                 Packet msg;
                 msg.type = MESSAGE;
                 strcpy(msg.data.content, message);
+                pthread_mutex_lock(&mutex);
                 for(int i = 0; i < players->nPlayers; ++i) {
                     writeToPipe(players->playerFd[i], &msg, sizeof(msg));
                 }
+                pthread_mutex_unlock(&mutex);
                 break;
 
             case UPDATE_POS:
+                pthread_mutex_lock(&mutex);
                 pid_t playerPid = typePacket.data.player.pid;
                 for(int i = 0; i < packet->players->nPlayers; ++i) {
                     if(playerPid == packet->players->array[i].pid) {
@@ -310,6 +315,29 @@ void *handleEvent(void *args) {
                         packet->players->array[i].xCoordinate = typePacket.data.player.xCoordinate;
                         packet->players->array[i].yCoordinate = typePacket.data.player.yCoordinate;
                         packet->map->array[typePacket.data.player.yCoordinate][typePacket.data.player.xCoordinate] = packet->players->array[i].icone;
+                    }
+                }
+                pthread_mutex_unlock(&mutex);
+                break;
+
+            case PLAYER_JOIN:
+                int conf = 0;
+                typePacket.data.player.isPlaying = 0;
+                pthread_mutex_lock(&mutex);
+                players->array[players->nPlayers] = typePacket.data.player;
+                sprintf(players->array[players->nPlayers].name, "Spectator%d", players->nPlayers);
+                players->array[players->nPlayers].icone = ' ';
+                int newPlayerFd = openPipeForWriting(players->array[players->nPlayers].pipe);
+                players->playerFd[players->nPlayers] = newPlayerFd;
+                players->nPlayers++;
+                pthread_mutex_unlock(&mutex);
+                writeToPipe(newPlayerFd, &conf, sizeof(int));
+                Packet msg1;
+                msg1.type = MESSAGE;
+                sprintf(msg1.data.content, "%s entrou\0\n", players->array[players->nPlayers - 1].name);
+                for(int i = 0; i < players->nPlayers; ++i) {
+                    if(players->array[i].pid != players->array[players->nPlayers - 1].pid) {
+                        writeToPipe(players->playerFd[i], &msg1, sizeof(Packet));
                     }
                 }
                 break;
@@ -556,7 +584,9 @@ void playerLobby(KeyboardHandlerPacket *keyboardPacket, int inscricao, int nplay
 
 void getPlayer(PlayerArray *players, int motorFd) {
     int confirmationFlag = 0;
-    readFromPipe(motorFd, &players->array[players->nPlayers], sizeof(Player));
+    Packet reg = {0};
+    readFromPipe(motorFd, &reg, sizeof(Packet));
+    players->array[players->nPlayers] = reg.data.player;
     int currentjogoUIFd = openPipeForWriting(players->array[players->nPlayers].pipe);
     if (isNameAvailable(players, players->array[players->nPlayers].name)) {
         players->array[players->nPlayers].isPlaying = 1;
@@ -642,6 +672,7 @@ void initBot(KeyboardHandlerPacket *packet) {
     }
     printf("Bots vao terminar\n");
     packet->map->currentStones = 0;
+    packet->bots->nBots = 0;
     close(pipe_fd[0]); 
     wait(NULL);
 }
@@ -683,9 +714,11 @@ void botsCommand(KeyboardHandlerPacket *packet) {
 void bmovCommand(KeyboardHandlerPacket *packet) {
     BmovArray *bmovs = packet->bmovs;
     if(bmovs->nbmovs < MAX_BMOVS) {
+        pthread_mutex_lock(&mutex);
         initBmov(packet, &bmovs->bmovs[bmovs->nbmovs]);
         bmovs->nbmovs++;
         printf("Bmov added successfuly\n");
+        pthread_mutex_unlock(&mutex);
     } else {
         printf("Max Num of Bmovs\n");
         return;
@@ -700,6 +733,9 @@ void initBmov(KeyboardHandlerPacket *packet, Bmov *bmov) {
     do {
         x = generateRandom(0, MAX_WIDTH - 2);
         y = generateRandom(0, MAX_WIDTH - 2);
+        if(x % 2 != 0 || y % 2 != 0) {
+            continue;
+        }
     } while(map->array[x][y] != ' ');
     
     bmov->x = x;
@@ -713,48 +749,13 @@ void rbmCommand(KeyboardHandlerPacket *packet) {
         printf("No bmovs to remove\n");
         return;
     }
-
+    pthread_mutex_lock(&mutex);
     for(int i = 0; i < bmovs->nbmovs - 1; ++i) {
         bmovs->bmovs[i] = bmovs->bmovs[i + 1];
     }
-
     bmovs->nbmovs--;
+    pthread_mutex_unlock(&mutex);
+
     printf("Bmov removed\n");
 }
 
-int checkWinner(KeyboardHandlerPacket *packet) {
-    int loopSize = packet->players->nPlayers;
-    int winnerX = 0; //se o x for zero siginfica que conseguiu passar
-    for(int i = 0; i < loopSize; ++i) {
-        if(packet->players->array[i].xCoordinate == winnerX) {
-            return i;
-        }
-    }
-    return -1;
-    //devolve -1 se nao houver ninguem ou o indice do vencedor
-}
-
-void updateSpectators(SpectatorHandlerPacket *packet) {
-    int loopSize = packet->spectators->nSpectators;
-    for(int i = 0; i < loopSize; ++i) {
-        Packet packetSender;
-        packetSender.type = SYNC;
-        packetSender.data.syncPacket.players = *(packet->packet->players);
-        packetSender.data.syncPacket.isGameRunning = *(packet->packet->isGameRunning);
-        packetSender.data.syncPacket.currentLevel = *(packet->packet->currentLevel);
-        writeToPipe(packet->spectators->spectatorFd[i], &packetSender, sizeof(Packet));
-        //para usar isto falta fazer initSync para os spectators
-    }
-}
-
-/*void syncPlayers(PlayerArray *players, Map *map, int *isGameRunning, int *currentLevel) {
-    for(int i = 0; i < players->nPlayers; ++i) {
-        Packet packetSender;
-        packetSender.type = SYNC;
-        packetSender.data.syncPacket.players = *players;
-        packetSender.data.syncPacket.map = *map;
-        packetSender.data.syncPacket.isGameRunning = *isGameRunning;
-        packetSender.data.syncPacket.currentLevel = *currentLevel;
-        writeToPipe(players->playerFd[i], &packetSender, sizeof(Packet));
-    }
-}*/

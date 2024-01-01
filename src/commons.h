@@ -35,7 +35,8 @@ typedef enum {
     SYNC,
     END,
     UPDATE_POS,
-    PLAYER_WON
+    PLAYER_WON,
+    PLAYER_JOIN
 } MessageType;
 
 typedef struct {
@@ -47,17 +48,6 @@ typedef struct {
     char icone;
     int isPlaying;
 } Player;
-
-typedef struct {
-    pid_t pid;
-    char pipe[MAX_PIPE_SIZE];
-} Spectator;
-
-typedef struct {
-    Spectator array[20];
-    int spectatorFd[20];
-    int nSpectators;
-} SpectatorArray;
 
 typedef struct {
     Player array[MAX_PLAYERS];
@@ -100,7 +90,6 @@ typedef struct {
 
 typedef struct {
     PlayerArray *players;
-    //SpectatorArray *spectators;
     Map *map;
     BotArray *bots;
     BmovArray *bmovs;
@@ -110,11 +99,6 @@ typedef struct {
     int *isGameRunning;
     int *currentLevel;
 } KeyboardHandlerPacket;
-
-typedef struct {
-    KeyboardHandlerPacket *packet;
-    SpectatorArray *spectators;
-} SpectatorHandlerPacket;
 
 typedef struct {
     PlayerArray players;

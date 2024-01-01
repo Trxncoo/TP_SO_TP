@@ -212,7 +212,10 @@ void *handleEvents(void *args) {
 void registerUser(int *motorFd, int *jogoUIFd, Player *player) {
     int confirmationFlag = 0;
     *motorFd = openPipeForWriting(JOGOUI_TO_MOTOR_PIPE);
-    writeToPipe(*motorFd, player, sizeof(Player));
+    Packet reg;
+    reg.type = PLAYER_JOIN;
+    reg.data.player = *player;
+    writeToPipe(*motorFd, &reg, sizeof(Packet));
 
     *jogoUIFd = openPipeForReading(player->pipe);
     readFromPipe(*jogoUIFd, &confirmationFlag, sizeof(int));
@@ -220,7 +223,7 @@ void registerUser(int *motorFd, int *jogoUIFd, Player *player) {
     if(confirmationFlag) {
         printf("O jogo vai comecar dentro de poucos segundos! Esteja pronto para jogar\n");
     } else {
-        printf("Oops, ja existe alguem com este nome, vai ficar como espetador!\n");
+        printf("Oops, ja existe alguem com este nome ou o jogo ja comecou, vai ficar como espetador!\n");
     }
 }
 
