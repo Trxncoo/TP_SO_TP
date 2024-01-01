@@ -86,14 +86,16 @@ int main(int argc, char* argv[]) {
                         readCommand(commandBuffer, sizeof(commandBuffer));
                         handleCommand(commandBuffer, &keyboardPacket);
                 }
-
-                int myPos = findMyself(&keyboardPacket);
-                Packet move;
-                move.type = UPDATE_POS;
-                move.data.player = keyboardPacket.players->array[myPos];
-                writeToPipe(*keyboardPacket.motorFd, &move, sizeof(Packet));
-                wrefresh(topWindow);
-                wrefresh(bottomWindow);
+                if(player.isPlaying) {
+                    int myPos = findMyself(&keyboardPacket);
+                    Packet move;
+                    move.type = UPDATE_POS;
+                    move.data.player = keyboardPacket.players->array[myPos];
+                    writeToPipe(*keyboardPacket.motorFd, &move, sizeof(Packet));
+                    wrefresh(topWindow);
+                    wrefresh(bottomWindow);
+                }
+                
             }
         }
     }
@@ -169,7 +171,7 @@ void *handleEvents(void *args) {
             case MESSAGE:
                 wclear(bottomWindow);
                 box(bottomWindow, 0, 0);
-                mvwprintw(bottomWindow, 1, 1, "%s\n", packet.data.content);
+                mvwprintw(bottomWindow, 1, 1, "%s", packet.data.content);
                 wrefresh(bottomWindow);
                 break;
 
@@ -214,6 +216,12 @@ void registerUser(int *motorFd, int *jogoUIFd, Player *player) {
 
     *jogoUIFd = openPipeForReading(player->pipe);
     readFromPipe(*jogoUIFd, &confirmationFlag, sizeof(int));
+    player->isPlaying = confirmationFlag;
+    if(confirmationFlag) {
+        printf("O jogo vai comecar dentro de poucos segundos! Esteja pronto para jogar\n");
+    } else {
+        printf("Oops, ja existe alguem com este nome, vai ficar como espetador!\n");
+    }
 }
 
 void initJogoUI(Player* player, const int argc, char* argv[]) {
@@ -274,7 +282,9 @@ void msgCommand(KeyboardHandlerPacket *packet, char *arg1, char *arg2) {
     for(int i = 0; i < packet->players->nPlayers; ++i) {
         if(!strcmp(packet->players->array[i].name, arg1)) {
             Packet packetSender = {MESSAGE};
-            strcpy(packetSender.data.content, arg2);
+            char msgBuffer[50];
+            sprintf(msgBuffer, "<%s> %s\0", packet->players->array[findMyself(packet)].name, arg2);
+            strcpy(packetSender.data.content, msgBuffer);
             int fd = openPipeForWriting(packet->players->array[i].pipe);
             writeToPipe(fd, &packetSender, sizeof(Packet));
             close(fd);
@@ -284,7 +294,7 @@ void msgCommand(KeyboardHandlerPacket *packet, char *arg1, char *arg2) {
 
 void playersCommand(KeyboardHandlerPacket *packet) {
     for(int i = 0; i < packet->players->nPlayers; ++i) {
-        mvwprintw(bottomWindow, i + 1, 1, "Nome | Icone: %s | %c\n", packet->players->array[i].name, packet->players->array[i].icone);
+        mvwprintw(bottomWindow, i + 1, 1, "Nome | Icone: %s | %c\0\n", packet->players->array[i].name, packet->players->array[i].icone);
     }
 }
 

@@ -88,10 +88,18 @@ int main(int argc, char* argv[]) {
         startBots(&keyboardPacket, &botHandlerThread);
         startStones(&keyboardPacket, &stonesHandlerThread);
         startBmovs(&keyboardPacket, &bmovHandlerThread);
-        tempo = duracao - decremento * currentLevel;
+        tempo = duracao - decremento * (currentLevel - 1);
 
         while(isGameRunning && tempo != 0) {
             sleep(1);
+            tempo--;
+            printf("Time Left: %d\n", tempo);
+        }
+        Packet msg;
+        msg.type = MESSAGE;
+        sprintf(msg.data.content, "Nivel %d terminado, aguarde...", currentLevel);
+        for(int i = 0; i < keyboardPacket.players->nPlayers; ++i) {
+            writeToPipe(keyboardPacket.players->playerFd[i], &msg, sizeof(Packet));
         }
         currentLevel++;
         isGameRunning = 0;
@@ -308,8 +316,8 @@ void *handleEvent(void *args) {
         }
         syncPlayers(players, packet->map, packet->isGameRunning, packet->currentLevel);
         for(int i = 0; i < packet->players->nPlayers; ++i) {
-            if(packet->players->array[i].yCoordinate == 0) {
-                printf("Jogador %s ganhou o jogo\n", packet->players->array[i].name);
+            if(packet->players->array[i].yCoordinate == 0 && packet->players->array[i].xCoordinate > 1) {
+                printf("Jogador %s ganhou o jogo\0\n", packet->players->array[i].name);
                 *packet->isGameRunning = 0;
                 Packet win;
                 win.type = PLAYER_WON;
@@ -387,8 +395,6 @@ void *handleBmovs(void *args) {
     Map *map = packet->map;
     while(*packet->isGameRunning) { //  todo: adicionar mutex
         sleep(1);
-        printf("Tick\n");   
-        fflush(stdout);
         for(int i = 0; i < bmovs->nbmovs; ++i) {
             map->array[bmovs->bmovs[i].y][bmovs->bmovs[i].x] = ' ';
             bmovWalk(&bmovs->bmovs[i], players, map);
@@ -466,7 +472,7 @@ void kickCommand(KeyboardHandlerPacket *packet, const char *name) {
         if(!strcmp(packet->players->array[i].name, name)) {
             Packet packetSender;
             packetSender.type = KICK;
-            strcpy(packetSender.data.content, "Voce foi expulso pelo motor");
+            strcpy(packetSender.data.content, "Voce foi expulso pelo motor\0");
             int fd = openPipeForWriting(packet->players->array[i].pipe);
             writeToPipe(fd, &packetSender, sizeof(Packet));
             close(fd);
@@ -476,7 +482,7 @@ void kickCommand(KeyboardHandlerPacket *packet, const char *name) {
             Packet msg;
             msg.type = MESSAGE;
             char message[100];
-            sprintf(message, "O jogador %s foi expulso do jogo", name);
+            sprintf(message, "O jogador %s foi expulso do jogo\0", name);
             strcpy(msg.data.content, message);
             for(int i = 0; i < packet->players->nPlayers; ++i) {
                 writeToPipe(packet->players->playerFd[i], &msg, sizeof(Packet));
@@ -490,7 +496,7 @@ void kickCommand(KeyboardHandlerPacket *packet, const char *name) {
 void endCommand(KeyboardHandlerPacket *packet) {
     Packet packetSender;
     packetSender.type = END;
-    strcpy(packetSender.data.content, "O jogo foi terminado");
+    strcpy(packetSender.data.content, "O jogo foi terminado\0");
     for(int i = 0; i < packet->players->nPlayers; ++i) {
         writeToPipe(packet->players->playerFd[i], &packetSender, sizeof(Packet));
     }
@@ -557,6 +563,8 @@ void getPlayer(PlayerArray *players, int motorFd) {
         confirmationFlag = 1;
         writeToPipe(currentjogoUIFd, &confirmationFlag, sizeof(int));
     } else {
+        sprintf(players->array[players->nPlayers].name, "Spectator%d", players->nPlayers);
+        players->array[players->nPlayers].icone = ' ';
         writeToPipe(currentjogoUIFd, &confirmationFlag, sizeof(int));
     }
 
@@ -649,6 +657,10 @@ void initPlayerLocations(KeyboardHandlerPacket *packet) {
     int startingRow = MAX_HEIGHT - 1;
 
     for(int i = 0; i < players->nPlayers; ++i) {
+        if(players->array[i].isPlaying == 0) {
+            continue;
+        }
+
         int randomX = 0;
         int icone = players->array[i].icone;
         players->array[i].yCoordinate = startingRow;

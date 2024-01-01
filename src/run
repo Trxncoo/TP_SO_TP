@@ -1,4 +1,4 @@
-export INSCRICAO=10
+export INSCRICAO=30
 export NPLAYERS=3
 export DURACAO=300
 export DECREMENTO=10
@@ -16,7 +16,7 @@ gnome-terminal  --full-screen -- bash -c "./motor; exit"
 sleep 0.5
 gnome-terminal  --full-screen -- bash -c "./jogoUI Joana; exit"
 sleep 0.1
-gnome-terminal  --full-screen -- bash -c "./jogoUI Pedro; exit"
+gnome-terminal  --full-screen -- bash -c "./jogoUI Joana; exit"
 sleep 0.1
 gnome-terminal  --full-screen -- bash -c "./jogoUI Gabriel; exit"
 sleep 0.1
