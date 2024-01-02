@@ -98,6 +98,8 @@ int main(int argc, char* argv[]) {
                 
             }
         }
+        wclear(bottomWindow);
+        box(bottomWindow, 0, 0);
     }
 
 
